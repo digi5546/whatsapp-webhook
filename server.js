@@ -5,6 +5,9 @@ const app = express();
 app.use(express.json());
 
 const VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN;
+const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
+const GRAPH_API_VERSION = "v25.0";
 
 // Home page
 app.get("/", (req, res) => {
@@ -13,7 +16,6 @@ app.get("/", (req, res) => {
 
 // Meta webhook verification
 app.get("/webhook", (req, res) => {
-
     const mode = req.query["hub.mode"];
     const token = req.query["hub.verify_token"];
     const challenge = req.query["hub.challenge"];
@@ -29,61 +31,84 @@ app.get("/webhook", (req, res) => {
     return res.sendStatus(403);
 });
 
+// Send WhatsApp message
+async function sendWhatsAppMessage(to, text) {
+    const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+
+    const response = await fetch(url, {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to: to,
+            type: "text",
+            text: {
+                body: text
+            }
+        })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(JSON.stringify(data));
+    }
+
+    console.log("WhatsApp reply sent:");
+    console.log(JSON.stringify(data, null, 2));
+}
+
 // Receive WhatsApp messages
 app.post("/webhook", (req, res) => {
-
     console.log("WhatsApp webhook received:");
-
     console.log(JSON.stringify(req.body, null, 2));
 
     if (req.body.object === "whatsapp_business_account") {
-
         const entries = req.body.entry || [];
 
         entries.forEach((entry) => {
-
             const changes = entry.changes || [];
 
             changes.forEach((change) => {
-
                 const value = change.value;
 
-                // Incoming messages
                 if (value.messages) {
-
                     value.messages.forEach((message) => {
-
                         console.log("---------------");
                         console.log("MESSAGE RECEIVED");
-
                         console.log("From:", message.from);
                         console.log("Message ID:", message.id);
                         console.log("Type:", message.type);
 
                         if (message.type === "text") {
-                            console.log(
-                                "Message:",
-                                message.text.body
-                            );
+                            console.log("Message:", message.text.body);
+
+                            sendWhatsAppMessage(
+                                message.from,
+                                "Hello! 👋 Thanks for messaging Digi Wealth. We received your message."
+                            ).catch((error) => {
+                                console.error(
+                                    "Failed to send WhatsApp reply:",
+                                    error.message
+                                );
+                            });
                         }
 
                         console.log("---------------");
                     });
                 }
 
-                // Message status
                 if (value.statuses) {
-
                     value.statuses.forEach((status) => {
-
                         console.log("STATUS UPDATE");
                         console.log("ID:", status.id);
                         console.log("Status:", status.status);
                     });
                 }
-
             });
-
         });
     }
 
