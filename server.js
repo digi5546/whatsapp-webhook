@@ -33,7 +33,9 @@ app.get("/webhook", (req, res) => {
 
 // Send WhatsApp message
 async function sendWhatsAppMessage(to, text) {
-    const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+    const url =
+        `https://graph.facebook.com/${GRAPH_API_VERSION}/` +
+        `${WHATSAPP_PHONE_NUMBER_ID}/messages`;
 
     const response = await fetch(url, {
         method: "POST",
@@ -57,8 +59,73 @@ async function sendWhatsAppMessage(to, text) {
         throw new Error(JSON.stringify(data));
     }
 
-    console.log("WhatsApp reply sent:");
-    console.log(JSON.stringify(data, null, 2));
+    console.log("WhatsApp reply sent successfully");
+}
+
+// Create menu reply
+function getReply(messageText) {
+    const text = messageText.trim().toLowerCase();
+
+    if (
+        text === "hi" ||
+        text === "hello" ||
+        text === "hey" ||
+        text === "start"
+    ) {
+        return `👋 Welcome to Digi Wealth!
+
+How can we help you today?
+
+1️⃣ Investment
+2️⃣ Insurance
+3️⃣ Loans
+4️⃣ Talk to an advisor
+
+Please reply with 1, 2, 3, or 4.`;
+    }
+
+    if (text === "1") {
+        return `📈 Investment
+
+Digi Wealth can help you understand investment options and financial planning.
+
+Reply 4 to talk to an advisor.`;
+    }
+
+    if (text === "2") {
+        return `🛡️ Insurance
+
+We can help you explore insurance and protection options.
+
+Reply 4 to talk to an advisor.`;
+    }
+
+    if (text === "3") {
+        return `💰 Loans
+
+We can help you with information about available loan options.
+
+Reply 4 to talk to an advisor.`;
+    }
+
+    if (text === "4") {
+        return `👨‍💼 Talk to an Advisor
+
+Thank you for choosing Digi Wealth.
+
+Our advisor will assist you shortly.`;
+    }
+
+    return `👋 Welcome to Digi Wealth!
+
+Please choose an option:
+
+1️⃣ Investment
+2️⃣ Insurance
+3️⃣ Loans
+4️⃣ Talk to an advisor
+
+Reply with 1, 2, 3, or 4.`;
 }
 
 // Receive WhatsApp messages
@@ -84,17 +151,19 @@ app.post("/webhook", (req, res) => {
                         console.log("Type:", message.type);
 
                         if (message.type === "text") {
-                            console.log("Message:", message.text.body);
+                            const incomingText = message.text.body;
 
-                            sendWhatsAppMessage(
-                                message.from,
-                                "Hello! 👋 Thanks for messaging Digi Wealth. We received your message."
-                            ).catch((error) => {
-                                console.error(
-                                    "Failed to send WhatsApp reply:",
-                                    error.message
-                                );
-                            });
+                            console.log("Message:", incomingText);
+
+                            const reply = getReply(incomingText);
+
+                            sendWhatsAppMessage(message.from, reply)
+                                .catch((error) => {
+                                    console.error(
+                                        "Failed to send WhatsApp reply:",
+                                        error.message
+                                    );
+                                });
                         }
 
                         console.log("---------------");
