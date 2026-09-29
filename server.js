@@ -1,20 +1,82 @@
 const express = require("express");
+const { Pool } = require("pg");
 
 const app = express();
 
 app.use(express.json());
 
+// ===============================
+// ENVIRONMENT VARIABLES
+// ===============================
+
 const VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN;
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
 const ADMIN_PANEL_KEY = process.env.ADMIN_PANEL_KEY;
+const DATABASE_URL = process.env.DATABASE_URL;
+
 const GRAPH_API_VERSION = "v25.0";
 
 // ===============================
-// CANDIDATE DATA
+// POSTGRESQL DATABASE
 // ===============================
 
-const candidates = {};
+if (!DATABASE_URL) {
+    console.error("DATABASE_URL is not configured.");
+}
+
+const pool = new Pool({
+    connectionString: DATABASE_URL
+});
+
+pool.on("error", (error) => {
+    console.error("Unexpected PostgreSQL pool error:", error);
+});
+
+// ===============================
+// INITIALIZE DATABASE
+// ===============================
+
+async function initializeDatabase() {
+    if (!DATABASE_URL) {
+        throw new Error("DATABASE_URL is not configured.");
+    }
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS candidates (
+            phone TEXT PRIMARY KEY,
+            last_message TIMESTAMPTZ NOT NULL
+        )
+    `);
+
+    console.log("PostgreSQL database initialized successfully.");
+}
+
+// ===============================
+// SAVE / UPDATE CANDIDATE
+// ===============================
+
+async function saveCandidate(phone) {
+    try {
+        await pool.query(
+            `
+            INSERT INTO candidates (phone, last_message)
+            VALUES ($1, NOW())
+            ON CONFLICT (phone)
+            DO UPDATE SET last_message = NOW()
+            `,
+            [phone]
+        );
+
+        console.log("Candidate saved to PostgreSQL:", phone);
+
+    } catch (error) {
+        console.error(
+            "Failed to save candidate to PostgreSQL:",
+            error.message
+        );
+    }
+}
 
 // ===============================
 // HOME
@@ -51,14 +113,19 @@ async function sendWhatsAppMessage(to, text) {
 
     const response = await fetch(url, {
         method: "POST",
+
         headers: {
             "Authorization": `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
             "Content-Type": "application/json"
         },
+
         body: JSON.stringify({
             messaging_product: "whatsapp",
+
             to: to,
+
             type: "text",
+
             text: {
                 body: text
             }
@@ -85,16 +152,22 @@ async function sendWhatsAppTemplate(to) {
 
     const response = await fetch(url, {
         method: "POST",
+
         headers: {
             "Authorization": `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
             "Content-Type": "application/json"
         },
+
         body: JSON.stringify({
             messaging_product: "whatsapp",
+
             to: to,
+
             type: "template",
+
             template: {
                 name: "sales_trainee_update",
+
                 language: {
                     code: "en"
                 }
@@ -126,7 +199,6 @@ function getReply(messageText) {
         text === "menu"
     ) {
         return `👋 Welcome to Digi Wealth!
-
 Thank you for your interest in the Sales Trainee position.
 
 How can we help you?
@@ -187,56 +259,106 @@ Reply with 1 or 2.`;
 
 app.post("/webhook", (req, res) => {
     console.log("WhatsApp webhook received:");
-    console.log(JSON.stringify(req.body, null, 2));
+
+    console.log(
+        JSON.stringify(req.body, null, 2)
+    );
 
     if (req.body.object === "whatsapp_business_account") {
+
         const entries = req.body.entry || [];
 
         entries.forEach((entry) => {
+
             const changes = entry.changes || [];
 
             changes.forEach((change) => {
+
                 const value = change.value;
 
+                // ===============================
+                // INCOMING MESSAGES
+                // ===============================
+
                 if (value.messages) {
+
                     value.messages.forEach((message) => {
 
                         console.log("---------------");
-                        console.log("MESSAGE RECEIVED");
-                        console.log("From:", message.from);
-                        console.log("Type:", message.type);
 
-                        // Save candidate information
-                        candidates[message.from] = {
-                            phone: message.from,
-                            lastMessage: new Date().toISOString()
-                        };
+                        console.log("MESSAGE RECEIVED");
+
+                        console.log(
+                            "From:",
+                            message.from
+                        );
+
+                        console.log(
+                            "Type:",
+                            message.type
+                        );
+
+                        // ===============================
+                        // SAVE CANDIDATE TO POSTGRES
+                        // ===============================
+
+                        saveCandidate(message.from);
+
+                        // ===============================
+                        // TEXT MESSAGE
+                        // ===============================
 
                         if (message.type === "text") {
-                            const incomingText = message.text.body;
 
-                            console.log("Message:", incomingText);
+                            const incomingText =
+                                message.text.body;
 
-                            const reply = getReply(incomingText);
+                            console.log(
+                                "Message:",
+                                incomingText
+                            );
 
-                            sendWhatsAppMessage(message.from, reply)
-                                .catch((error) => {
-                                    console.error(
-                                        "Failed to send WhatsApp reply:",
-                                        error.message
-                                    );
-                                });
+                            const reply =
+                                getReply(incomingText);
+
+                            sendWhatsAppMessage(
+                                message.from,
+                                reply
+                            ).catch((error) => {
+
+                                console.error(
+                                    "Failed to send WhatsApp reply:",
+                                    error.message
+                                );
+
+                            });
                         }
 
                         console.log("---------------");
                     });
                 }
 
+                // ===============================
+                // STATUS UPDATES
+                // ===============================
+
                 if (value.statuses) {
+
                     value.statuses.forEach((status) => {
-                        console.log("STATUS UPDATE");
-                        console.log("ID:", status.id);
-                        console.log("Status:", status.status);
+
+                        console.log(
+                            "STATUS UPDATE"
+                        );
+
+                        console.log(
+                            "ID:",
+                            status.id
+                        );
+
+                        console.log(
+                            "Status:",
+                            status.status
+                        );
                     });
                 }
             });
@@ -251,14 +373,24 @@ app.post("/webhook", (req, res) => {
 // ===============================
 
 function checkAdmin(req, res, next) {
-    const key = req.headers["x-admin-key"];
+
+    const key =
+        req.headers["x-admin-key"];
 
     if (!ADMIN_PANEL_KEY) {
-        return res.status(500).send("ADMIN_PANEL_KEY is not configured.");
+
+        return res
+            .status(500)
+            .send(
+                "ADMIN_PANEL_KEY is not configured."
+            );
     }
 
     if (key !== ADMIN_PANEL_KEY) {
-        return res.status(401).send("Unauthorized");
+
+        return res
+            .status(401)
+            .send("Unauthorized");
     }
 
     next();
@@ -268,24 +400,59 @@ function checkAdmin(req, res, next) {
 // CANDIDATE LIST API
 // ===============================
 
-app.get("/api/candidates", checkAdmin, (req, res) => {
-    res.json(Object.values(candidates));
-});
+app.get(
+    "/api/candidates",
+    checkAdmin,
+    async (req, res) => {
+
+        try {
+
+            const result = await pool.query(`
+                SELECT
+                    phone,
+                    last_message AS "lastMessage"
+                FROM candidates
+                ORDER BY last_message DESC
+            `);
+
+            res.json(result.rows);
+
+        } catch (error) {
+
+            console.error(
+                "Failed to load candidates:",
+                error.message
+            );
+
+            res.status(500).json({
+                error:
+                    "Failed to load candidates."
+            });
+        }
+    }
+);
 
 // ===============================
 // HR PANEL
 // ===============================
 
 app.get("/hr", (req, res) => {
+
     res.send(`
 <!DOCTYPE html>
 <html>
+
 <head>
+
     <title>Digi Wealth HR Panel</title>
 
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
 
     <style>
+
         body {
             font-family: Arial, sans-serif;
             max-width: 700px;
@@ -300,7 +467,9 @@ app.get("/hr", (req, res) => {
             border-radius: 12px;
         }
 
-        input, textarea {
+        input,
+        textarea {
+
             width: 100%;
             padding: 12px;
             margin-top: 8px;
@@ -308,6 +477,7 @@ app.get("/hr", (req, res) => {
             box-sizing: border-box;
             border: 1px solid #ccc;
             border-radius: 8px;
+
         }
 
         textarea {
@@ -315,31 +485,41 @@ app.get("/hr", (req, res) => {
         }
 
         button {
+
             padding: 12px 18px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
             margin-right: 8px;
             margin-bottom: 10px;
+
         }
 
         .template {
+
             background: #25D366;
             color: white;
+
         }
 
         .text {
+
             background: #333;
             color: white;
+
         }
 
         #result {
+
             margin-top: 20px;
             padding: 12px;
             border-radius: 8px;
             display: none;
+
         }
+
     </style>
+
 </head>
 
 <body>
@@ -348,33 +528,50 @@ app.get("/hr", (req, res) => {
 
     <h2>📱 Digi Wealth HR Panel</h2>
 
-    <p>Send WhatsApp message to a candidate.</p>
+    <p>
+        Send WhatsApp message to a candidate.
+    </p>
 
-    <label>HR Panel Key</label>
+    <label>
+        HR Panel Key
+    </label>
+
     <input
         type="password"
         id="adminKey"
         placeholder="Enter HR panel key"
     >
 
-    <label>Candidate WhatsApp Number</label>
+    <label>
+        Candidate WhatsApp Number
+    </label>
+
     <input
         type="text"
         id="phone"
         placeholder="Example: 919876543210"
     >
 
-    <label>Message</label>
+    <label>
+        Message
+    </label>
+
     <textarea
         id="message"
         placeholder="Type your message here..."
     ></textarea>
 
-    <button class="template" onclick="sendTemplate()">
+    <button
+        class="template"
+        onclick="sendTemplate()"
+    >
         📋 Send Approved Template
     </button>
 
-    <button class="text" onclick="sendText()">
+    <button
+        class="text"
+        onclick="sendText()"
+    >
         💬 Send Text Message
     </button>
 
@@ -382,9 +579,14 @@ app.get("/hr", (req, res) => {
 
     <hr>
 
-    <h3>👥 Candidates</h3>
+    <h3>
+        👥 Candidates
+    </h3>
 
-    <button class="text" onclick="loadCandidates()">
+    <button
+        class="text"
+        onclick="loadCandidates()"
+    >
         🔄 Load Candidates
     </button>
 
@@ -396,251 +598,462 @@ app.get("/hr", (req, res) => {
 
 async function sendTemplate() {
 
-    const key = document.getElementById("adminKey").value;
-    const phone = document.getElementById("phone").value;
+    const key =
+        document.getElementById(
+            "adminKey"
+        ).value;
+
+    const phone =
+        document.getElementById(
+            "phone"
+        ).value;
 
     if (!key || !phone) {
-        showResult("Please enter HR key and candidate number.", false);
+
+        showResult(
+            "Please enter HR key and candidate number.",
+            false
+        );
+
         return;
     }
 
-    showResult("Sending template...", true);
+    showResult(
+        "Sending template...",
+        true
+    );
 
     try {
 
-        const response = await fetch("/api/send-template", {
-            method: "POST",
+        const response =
+            await fetch(
+                "/api/send-template",
+                {
+                    method: "POST",
 
-            headers: {
-                "Content-Type": "application/json",
-                "x-admin-key": key
-            },
+                    headers: {
+                        "Content-Type":
+                            "application/json",
 
-            body: JSON.stringify({
-                phone: phone
-            })
-        });
+                        "x-admin-key":
+                            key
+                    },
 
-        const data = await response.json();
+                    body: JSON.stringify({
+                        phone: phone
+                    })
+                }
+            );
+
+        const data =
+            await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "Failed to send");
+
+            throw new Error(
+                data.error ||
+                "Failed to send"
+            );
         }
 
-        showResult("✅ Template sent successfully!", true);
+        showResult(
+            "✅ Template sent successfully!",
+            true
+        );
 
     } catch (error) {
 
-        showResult("❌ " + error.message, false);
-
+        showResult(
+            "❌ " + error.message,
+            false
+        );
     }
 }
 
+
+// ===============================
+// SEND TEXT
+// ===============================
 
 async function sendText() {
 
-    const key = document.getElementById("adminKey").value;
-    const phone = document.getElementById("phone").value;
-    const message = document.getElementById("message").value;
+    const key =
+        document.getElementById(
+            "adminKey"
+        ).value;
+
+    const phone =
+        document.getElementById(
+            "phone"
+        ).value;
+
+    const message =
+        document.getElementById(
+            "message"
+        ).value;
 
     if (!key || !phone || !message) {
-        showResult("Please enter all required fields.", false);
+
+        showResult(
+            "Please enter all required fields.",
+            false
+        );
+
         return;
     }
 
-    showResult("Sending message...", true);
+    showResult(
+        "Sending message...",
+        true
+    );
 
     try {
 
-        const response = await fetch("/api/send-text", {
-            method: "POST",
+        const response =
+            await fetch(
+                "/api/send-text",
+                {
+                    method: "POST",
 
-            headers: {
-                "Content-Type": "application/json",
-                "x-admin-key": key
-            },
+                    headers: {
+                        "Content-Type":
+                            "application/json",
 
-            body: JSON.stringify({
-                phone: phone,
-                message: message
-            })
-        });
+                        "x-admin-key":
+                            key
+                    },
 
-        const data = await response.json();
+                    body: JSON.stringify({
+                        phone: phone,
+                        message: message
+                    })
+                }
+            );
+
+        const data =
+            await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "Failed to send");
+
+            throw new Error(
+                data.error ||
+                "Failed to send"
+            );
         }
 
-        showResult("✅ Message sent successfully!", true);
+        showResult(
+            "✅ Message sent successfully!",
+            true
+        );
 
     } catch (error) {
 
-        showResult("❌ " + error.message, false);
-
+        showResult(
+            "❌ " + error.message,
+            false
+        );
     }
 }
 
+
+// ===============================
+// LOAD CANDIDATES
+// ===============================
 
 async function loadCandidates() {
 
-    const key = document.getElementById("adminKey").value;
+    const key =
+        document.getElementById(
+            "adminKey"
+        ).value;
 
     if (!key) {
-        showResult("Please enter HR panel key.", false);
+
+        showResult(
+            "Please enter HR panel key.",
+            false
+        );
+
         return;
     }
 
-    showResult("Loading candidates...", true);
+    showResult(
+        "Loading candidates...",
+        true
+    );
 
     try {
 
-        const response = await fetch("/api/candidates", {
-            method: "GET",
+        const response =
+            await fetch(
+                "/api/candidates",
+                {
+                    method: "GET",
 
-            headers: {
-                "x-admin-key": key
-            }
-        });
+                    headers: {
+                        "x-admin-key":
+                            key
+                    }
+                }
+            );
 
-        const data = await response.json();
+        const data =
+            await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "Failed to load candidates");
+
+            throw new Error(
+                data.error ||
+                "Failed to load candidates"
+            );
         }
 
-        const container = document.getElementById("candidates");
+        const container =
+            document.getElementById(
+                "candidates"
+            );
 
         if (data.length === 0) {
-            container.innerHTML = "<p>No candidates found yet.</p>";
+
+            container.innerHTML =
+                "<p>No candidates found yet.</p>";
+
+            showResult(
+                "No candidates found yet.",
+                true
+            );
+
             return;
         }
 
-        container.innerHTML = data.map(function(candidate) {
+        container.innerHTML =
+            data.map(function(candidate) {
 
-            return (
-                '<div style="border:1px solid #ddd;' +
-                'padding:12px;margin-top:10px;' +
-                'border-radius:8px;background:#fafafa;">' +
-                '<strong>📱 ' + candidate.phone + '</strong><br>' +
-                '<small>Last message: ' + candidate.lastMessage + '</small>' +
-                '</div>'
-            );
+                return (
 
-        }).join("");
+                    '<div style="' +
+                    'border:1px solid #ddd;' +
+                    'padding:12px;' +
+                    'margin-top:10px;' +
+                    'border-radius:8px;' +
+                    'background:#fafafa;">' +
 
-        showResult("✅ Candidates loaded successfully.", true);
+                    '<strong>📱 ' +
+                    candidate.phone +
+                    '</strong><br>' +
+
+                    '<small>Last message: ' +
+                    candidate.lastMessage +
+                    '</small>' +
+
+                    '</div>'
+
+                );
+
+            }).join("");
+
+        showResult(
+            "✅ Candidates loaded successfully.",
+            true
+        );
 
     } catch (error) {
 
-        showResult("❌ " + error.message, false);
-
+        showResult(
+            "❌ " + error.message,
+            false
+        );
     }
 }
 
 
-function showResult(message, success) {
+// ===============================
+// RESULT MESSAGE
+// ===============================
 
-    const result = document.getElementById("result");
+function showResult(
+    message,
+    success
+) {
 
-    result.style.display = "block";
-    result.innerText = message;
+    const result =
+        document.getElementById(
+            "result"
+        );
 
+    result.style.display =
+        "block";
+
+    result.innerText =
+        message;
 }
 
 </script>
 
 </body>
+
 </html>
     `);
+
 });
 
 // ===============================
 // SEND TEMPLATE FROM HR PANEL
 // ===============================
 
-app.post("/api/send-template", checkAdmin, async (req, res) => {
+app.post(
+    "/api/send-template",
+    checkAdmin,
+    async (req, res) => {
 
-    try {
+        try {
 
-        const phone = String(req.body.phone || "")
-            .replace(/\D/g, "");
+            const phone =
+                String(
+                    req.body.phone || ""
+                ).replace(/\D/g, "");
 
-        if (!phone) {
-            return res.status(400).json({
-                error: "Candidate WhatsApp number is required."
+            if (!phone) {
+
+                return res
+                    .status(400)
+                    .json({
+                        error:
+                            "Candidate WhatsApp number is required."
+                    });
+            }
+
+            const result =
+                await sendWhatsAppTemplate(
+                    phone
+                );
+
+            console.log(
+                "Template sent to:",
+                phone
+            );
+
+            res.json({
+                success: true,
+                result: result
+            });
+
+        } catch (error) {
+
+            console.error(
+                "Template send failed:",
+                error.message
+            );
+
+            res.status(500).json({
+                error:
+                    error.message
             });
         }
-
-        const result = await sendWhatsAppTemplate(phone);
-
-        console.log("Template sent to:", phone);
-
-        res.json({
-            success: true,
-            result: result
-        });
-
-    } catch (error) {
-
-        console.error("Template send failed:", error.message);
-
-        res.status(500).json({
-            error: error.message
-        });
     }
-});
+);
 
 // ===============================
 // SEND TEXT FROM HR PANEL
 // ===============================
 
-app.post("/api/send-text", checkAdmin, async (req, res) => {
+app.post(
+    "/api/send-text",
+    checkAdmin,
+    async (req, res) => {
 
-    try {
+        try {
 
-        const phone = String(req.body.phone || "")
-            .replace(/\D/g, "");
+            const phone =
+                String(
+                    req.body.phone || ""
+                ).replace(/\D/g, "");
 
-        const message = String(req.body.message || "").trim();
+            const message =
+                String(
+                    req.body.message || ""
+                ).trim();
 
-        if (!phone) {
-            return res.status(400).json({
-                error: "Candidate WhatsApp number is required."
+            if (!phone) {
+
+                return res
+                    .status(400)
+                    .json({
+                        error:
+                            "Candidate WhatsApp number is required."
+                    });
+            }
+
+            if (!message) {
+
+                return res
+                    .status(400)
+                    .json({
+                        error:
+                            "Message is required."
+                    });
+            }
+
+            const result =
+                await sendWhatsAppMessage(
+                    phone,
+                    message
+                );
+
+            console.log(
+                "Text message sent to:",
+                phone
+            );
+
+            res.json({
+                success: true,
+                result: result
+            });
+
+        } catch (error) {
+
+            console.error(
+                "Text send failed:",
+                error.message
+            );
+
+            res.status(500).json({
+                error:
+                    error.message
             });
         }
-
-        if (!message) {
-            return res.status(400).json({
-                error: "Message is required."
-            });
-        }
-
-        const result = await sendWhatsAppMessage(phone, message);
-
-        console.log("Text message sent to:", phone);
-
-        res.json({
-            success: true,
-            result: result
-        });
-
-    } catch (error) {
-
-        console.error("Text send failed:", error.message);
-
-        res.status(500).json({
-            error: error.message
-        });
     }
-});
+);
 
 // ===============================
 // START SERVER
 // ===============================
 
-const PORT = process.env.PORT || 10000;
+const PORT =
+    process.env.PORT || 10000;
 
-app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT}`);
-});
+initializeDatabase()
+    .then(() => {
+
+        app.listen(
+            PORT,
+            "0.0.0.0",
+            () => {
+
+                console.log(
+                    `Server running on port ${PORT}`
+                );
+
+            }
+        );
+
+    })
+    .catch((error) => {
+
+        console.error(
+            "Database initialization failed:",
+            error
+        );
+
+        process.exit(1);
+    });
