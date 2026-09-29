@@ -7,31 +7,38 @@ app.use(express.json());
 const VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN;
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
+const ADMIN_PANEL_KEY = process.env.ADMIN_PANEL_KEY;
+
 const GRAPH_API_VERSION = "v25.0";
 
-// Home page
+// ===============================
+// HOME
+// ===============================
+
 app.get("/", (req, res) => {
     res.send("WhatsApp Webhook is running!");
 });
 
-// Meta webhook verification
+// ===============================
+// META WEBHOOK VERIFICATION
+// ===============================
+
 app.get("/webhook", (req, res) => {
     const mode = req.query["hub.mode"];
     const token = req.query["hub.verify_token"];
     const challenge = req.query["hub.challenge"];
 
-    console.log("Webhook verification request received");
-
     if (mode === "subscribe" && token === VERIFY_TOKEN) {
-        console.log("Webhook verified successfully!");
         return res.status(200).send(challenge);
     }
 
-    console.log("Webhook verification failed");
     return res.sendStatus(403);
 });
 
-// Send WhatsApp message
+// ===============================
+// WHATSAPP TEXT MESSAGE
+// ===============================
+
 async function sendWhatsAppMessage(to, text) {
     const url =
         `https://graph.facebook.com/${GRAPH_API_VERSION}/` +
@@ -59,14 +66,53 @@ async function sendWhatsAppMessage(to, text) {
         throw new Error(JSON.stringify(data));
     }
 
-    console.log("WhatsApp reply sent successfully");
+    return data;
 }
 
-// Create recruitment reply
+// ===============================
+// WHATSAPP TEMPLATE MESSAGE
+// ===============================
+
+async function sendWhatsAppTemplate(to) {
+    const url =
+        `https://graph.facebook.com/${GRAPH_API_VERSION}/` +
+        `${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+
+    const response = await fetch(url, {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to: to,
+            type: "template",
+            template: {
+                name: "sales_trainee_update",
+                language: {
+                    code: "en"
+                }
+            }
+        })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(JSON.stringify(data));
+    }
+
+    return data;
+}
+
+// ===============================
+// RECRUITMENT AUTO REPLY
+// ===============================
+
 function getReply(messageText) {
     const text = messageText.trim().toLowerCase();
 
-    // Main menu
     if (
         text === "hi" ||
         text === "hello" ||
@@ -86,7 +132,6 @@ How can we help you?
 Please reply with 1 or 2.`;
     }
 
-    // Onboarding Form
     if (text === "1") {
         return `📋 Digi Wealth – Sales Trainee Onboarding
 
@@ -107,7 +152,6 @@ HR Team
 Digi Wealth`;
     }
 
-    // Talk to HR
     if (text === "2") {
         return `👨‍💼 Talk to HR
 
@@ -120,7 +164,6 @@ HR Team
 Digi Wealth`;
     }
 
-    // Default reply
     return `👋 Welcome to Digi Wealth!
 
 Thank you for your interest in the Sales Trainee position.
@@ -133,7 +176,10 @@ Please choose an option:
 Reply with 1 or 2.`;
 }
 
-// Receive WhatsApp messages
+// ===============================
+// RECEIVE WHATSAPP MESSAGES
+// ===============================
+
 app.post("/webhook", (req, res) => {
     console.log("WhatsApp webhook received:");
     console.log(JSON.stringify(req.body, null, 2));
@@ -149,10 +195,10 @@ app.post("/webhook", (req, res) => {
 
                 if (value.messages) {
                     value.messages.forEach((message) => {
+
                         console.log("---------------");
                         console.log("MESSAGE RECEIVED");
                         console.log("From:", message.from);
-                        console.log("Message ID:", message.id);
                         console.log("Type:", message.type);
 
                         if (message.type === "text") {
@@ -189,7 +235,324 @@ app.post("/webhook", (req, res) => {
     res.sendStatus(200);
 });
 
-// Render provides the PORT
+// ===============================
+// ADMIN AUTHENTICATION
+// ===============================
+
+function checkAdmin(req, res, next) {
+    const key = req.headers["x-admin-key"];
+
+    if (!ADMIN_PANEL_KEY) {
+        return res.status(500).send("ADMIN_PANEL_KEY is not configured.");
+    }
+
+    if (key !== ADMIN_PANEL_KEY) {
+        return res.status(401).send("Unauthorized");
+    }
+
+    next();
+}
+
+// ===============================
+// HR PANEL
+// ===============================
+
+app.get("/hr", (req, res) => {
+    res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Digi Wealth HR Panel</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 700px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .box {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            margin-top: 8px;
+            margin-bottom: 18px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+
+        textarea {
+            min-height: 150px;
+        }
+
+        button {
+            padding: 12px 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-right: 8px;
+            margin-bottom: 10px;
+        }
+
+        .template {
+            background: #25D366;
+            color: white;
+        }
+
+        .text {
+            background: #333;
+            color: white;
+        }
+
+        #result {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 8px;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="box">
+
+    <h2>📱 Digi Wealth HR Panel</h2>
+
+    <p>Send WhatsApp message to a candidate.</p>
+
+    <label>HR Panel Key</label>
+    <input
+        type="password"
+        id="adminKey"
+        placeholder="Enter HR panel key"
+    >
+
+    <label>Candidate WhatsApp Number</label>
+    <input
+        type="text"
+        id="phone"
+        placeholder="Example: 919876543210"
+    >
+
+    <label>Message</label>
+    <textarea
+        id="message"
+        placeholder="Type your message here..."
+    ></textarea>
+
+    <button class="template" onclick="sendTemplate()">
+        📋 Send Approved Template
+    </button>
+
+    <button class="text" onclick="sendText()">
+        💬 Send Text Message
+    </button>
+
+    <div id="result"></div>
+
+</div>
+
+<script>
+
+async function sendTemplate() {
+
+    const key = document.getElementById("adminKey").value;
+    const phone = document.getElementById("phone").value;
+
+    if (!key || !phone) {
+        showResult("Please enter HR key and candidate number.", false);
+        return;
+    }
+
+    showResult("Sending template...", true);
+
+    try {
+
+        const response = await fetch("/api/send-template", {
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json",
+                "x-admin-key": key
+            },
+
+            body: JSON.stringify({
+                phone: phone
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || "Failed to send");
+        }
+
+        showResult("✅ Template sent successfully!", true);
+
+    } catch (error) {
+
+        showResult("❌ " + error.message, false);
+
+    }
+}
+
+
+async function sendText() {
+
+    const key = document.getElementById("adminKey").value;
+    const phone = document.getElementById("phone").value;
+    const message = document.getElementById("message").value;
+
+    if (!key || !phone || !message) {
+        showResult("Please enter all required fields.", false);
+        return;
+    }
+
+    showResult("Sending message...", true);
+
+    try {
+
+        const response = await fetch("/api/send-text", {
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json",
+                "x-admin-key": key
+            },
+
+            body: JSON.stringify({
+                phone: phone,
+                message: message
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || "Failed to send");
+        }
+
+        showResult("✅ Message sent successfully!", true);
+
+    } catch (error) {
+
+        showResult("❌ " + error.message, false);
+
+    }
+}
+
+
+function showResult(message, success) {
+
+    const result = document.getElementById("result");
+
+    result.style.display = "block";
+    result.innerText = message;
+
+}
+
+</script>
+
+</body>
+</html>
+    `);
+});
+
+// ===============================
+// SEND TEMPLATE FROM HR PANEL
+// ===============================
+
+app.post("/api/send-template", checkAdmin, async (req, res) => {
+
+    try {
+
+        const phone = String(req.body.phone || "")
+            .replace(/\D/g, "");
+
+        if (!phone) {
+            return res.status(400).json({
+                error: "Candidate WhatsApp number is required."
+            });
+        }
+
+        const result = await sendWhatsAppTemplate(phone);
+
+        console.log("Template sent to:", phone);
+
+        res.json({
+            success: true,
+            result: result
+        });
+
+    } catch (error) {
+
+        console.error("Template send failed:", error.message);
+
+        res.status(500).json({
+            error: error.message
+        });
+    }
+});
+
+// ===============================
+// SEND TEXT FROM HR PANEL
+// ===============================
+
+app.post("/api/send-text", checkAdmin, async (req, res) => {
+
+    try {
+
+        const phone = String(req.body.phone || "")
+            .replace(/\D/g, "");
+
+        const message = String(req.body.message || "").trim();
+
+        if (!phone) {
+            return res.status(400).json({
+                error: "Candidate WhatsApp number is required."
+            });
+        }
+
+        if (!message) {
+            return res.status(400).json({
+                error: "Message is required."
+            });
+        }
+
+        const result = await sendWhatsAppMessage(phone, message);
+
+        console.log("Text message sent to:", phone);
+
+        res.json({
+            success: true,
+            result: result
+        });
+
+    } catch (error) {
+
+        console.error("Text send failed:", error.message);
+
+        res.status(500).json({
+            error: error.message
+        });
+    }
+});
+
+// ===============================
+// START SERVER
+// ===============================
+
 const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, "0.0.0.0", () => {
