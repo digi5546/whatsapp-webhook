@@ -9,6 +9,7 @@ const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
 const ADMIN_PANEL_KEY = process.env.ADMIN_PANEL_KEY;
 const GRAPH_API_VERSION = "v25.0";
+
 // ===============================
 // CANDIDATE DATA
 // ===============================
@@ -204,10 +205,12 @@ app.post("/webhook", (req, res) => {
                         console.log("MESSAGE RECEIVED");
                         console.log("From:", message.from);
                         console.log("Type:", message.type);
+
+                        // Save candidate information
                         candidates[message.from] = {
-    phone: message.from,
-    lastMessage: new Date().toISOString()
-};
+                            phone: message.from,
+                            lastMessage: new Date().toISOString()
+                        };
 
                         if (message.type === "text") {
                             const incomingText = message.text.body;
@@ -268,6 +271,7 @@ function checkAdmin(req, res, next) {
 app.get("/api/candidates", checkAdmin, (req, res) => {
     res.json(Object.values(candidates));
 });
+
 // ===============================
 // HR PANEL
 // ===============================
@@ -375,15 +379,16 @@ app.get("/hr", (req, res) => {
     </button>
 
     <div id="result"></div>
+
     <hr>
 
-<h3>👥 Candidates</h3>
+    <h3>👥 Candidates</h3>
 
-<button class="text" onclick="loadCandidates()">
-  🔄 Load Candidates
-</button>
+    <button class="text" onclick="loadCandidates()">
+        🔄 Load Candidates
+    </button>
 
-<div id="candidates"></div>
+    <div id="candidates"></div>
 
 </div>
 
@@ -476,6 +481,7 @@ async function sendText() {
     }
 }
 
+
 async function loadCandidates() {
 
     const key = document.getElementById("adminKey").value;
@@ -485,10 +491,13 @@ async function loadCandidates() {
         return;
     }
 
+    showResult("Loading candidates...", true);
+
     try {
 
         const response = await fetch("/api/candidates", {
             method: "GET",
+
             headers: {
                 "x-admin-key": key
             }
@@ -507,18 +516,20 @@ async function loadCandidates() {
             return;
         }
 
-        container.innerHTML = data.map(candidate => `
-            <div style="
-                border:1px solid #ddd;
-                padding:12px;
-                margin-top:10px;
-                border-radius:8px;
-                background:#fafafa;
-            ">
-                <strong>📱 ${candidate.phone}</strong><br>
-                <small>Last message: ${candidate.lastMessage}</small>
-            </div>
-        `).join("");
+        container.innerHTML = data.map(function(candidate) {
+
+            return (
+                '<div style="border:1px solid #ddd;' +
+                'padding:12px;margin-top:10px;' +
+                'border-radius:8px;background:#fafafa;">' +
+                '<strong>📱 ' + candidate.phone + '</strong><br>' +
+                '<small>Last message: ' + candidate.lastMessage + '</small>' +
+                '</div>'
+            );
+
+        }).join("");
+
+        showResult("✅ Candidates loaded successfully.", true);
 
     } catch (error) {
 
@@ -526,6 +537,8 @@ async function loadCandidates() {
 
     }
 }
+
+
 function showResult(message, success) {
 
     const result = document.getElementById("result");
