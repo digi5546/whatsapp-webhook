@@ -62,70 +62,75 @@ async function sendWhatsAppMessage(to, text) {
     console.log("WhatsApp reply sent successfully");
 }
 
-// Create menu reply
+// Create recruitment reply
 function getReply(messageText) {
     const text = messageText.trim().toLowerCase();
 
+    // Main menu
     if (
         text === "hi" ||
         text === "hello" ||
         text === "hey" ||
-        text === "start"
+        text === "start" ||
+        text === "menu"
     ) {
         return `👋 Welcome to Digi Wealth!
 
-How can we help you today?
+Thank you for your interest in the Sales Trainee position.
 
-1️⃣ Investment
-2️⃣ Insurance
-3️⃣ Loans
-4️⃣ Talk to an advisor
+How can we help you?
 
-Please reply with 1, 2, 3, or 4.`;
+1️⃣ Complete Onboarding Form
+2️⃣ Talk to HR
+
+Please reply with 1 or 2.`;
     }
 
+    // Onboarding Form
     if (text === "1") {
-        return `📈 Investment
+        return `📋 Digi Wealth – Sales Trainee Onboarding
 
-Digi Wealth can help you understand investment options and financial planning.
+Thank you for applying for the Sales Trainee position at Digi Wealth.
 
-Reply 4 to talk to an advisor.`;
+Please complete the Onboarding Form using the link below:
+
+🔗 https://docs.google.com/forms/d/e/1FAIpQLSe6hUHpqQ_2aYeSAVFGjJU8E7alJqE88CgiWsW9dEmBe0Qfdg/viewform?usp=header
+
+Kindly ensure that all the information provided is accurate and complete.
+
+Once we receive your completed form, our HR team will review your details and contact you regarding the next steps, including the interview/selection process.
+
+If you have any questions while filling out the form, please reply with 2 to talk to HR.
+
+Best regards,
+HR Team
+Digi Wealth`;
     }
 
+    // Talk to HR
     if (text === "2") {
-        return `🛡️ Insurance
+        return `👨‍💼 Talk to HR
 
-We can help you explore insurance and protection options.
+Thank you for contacting Digi Wealth HR.
 
-Reply 4 to talk to an advisor.`;
+Please type your question or message here, and our HR team will assist you regarding the Sales Trainee position.
+
+Thank you.
+HR Team
+Digi Wealth`;
     }
 
-    if (text === "3") {
-        return `💰 Loans
-
-We can help you with information about available loan options.
-
-Reply 4 to talk to an advisor.`;
-    }
-
-    if (text === "4") {
-        return `👨‍💼 Talk to an Advisor
-
-Thank you for choosing Digi Wealth.
-
-Our advisor will assist you shortly.`;
-    }
-
+    // Default reply
     return `👋 Welcome to Digi Wealth!
+
+Thank you for your interest in the Sales Trainee position.
 
 Please choose an option:
 
-1️⃣ Investment
-2️⃣ Insurance
-3️⃣ Loans
-4️⃣ Talk to an advisor
+1️⃣ Complete Onboarding Form
+2️⃣ Talk to HR
 
-Reply with 1, 2, 3, or 4.`;
+Reply with 1 or 2.`;
 }
 
 // Receive WhatsApp messages
