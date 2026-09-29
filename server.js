@@ -204,6 +204,10 @@ app.post("/webhook", (req, res) => {
                         console.log("MESSAGE RECEIVED");
                         console.log("From:", message.from);
                         console.log("Type:", message.type);
+                        candidates[message.from] = {
+    phone: message.from,
+    lastMessage: new Date().toISOString()
+};
 
                         if (message.type === "text") {
                             const incomingText = message.text.body;
