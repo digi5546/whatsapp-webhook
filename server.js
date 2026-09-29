@@ -375,6 +375,15 @@ app.get("/hr", (req, res) => {
     </button>
 
     <div id="result"></div>
+    <hr>
+
+<h3>👥 Candidates</h3>
+
+<button class="text" onclick="loadCandidates()">
+  🔄 Load Candidates
+</button>
+
+<div id="candidates"></div>
 
 </div>
 
@@ -467,7 +476,56 @@ async function sendText() {
     }
 }
 
+async function loadCandidates() {
 
+    const key = document.getElementById("adminKey").value;
+
+    if (!key) {
+        showResult("Please enter HR panel key.", false);
+        return;
+    }
+
+    try {
+
+        const response = await fetch("/api/candidates", {
+            method: "GET",
+            headers: {
+                "x-admin-key": key
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || "Failed to load candidates");
+        }
+
+        const container = document.getElementById("candidates");
+
+        if (data.length === 0) {
+            container.innerHTML = "<p>No candidates found yet.</p>";
+            return;
+        }
+
+        container.innerHTML = data.map(candidate => `
+            <div style="
+                border:1px solid #ddd;
+                padding:12px;
+                margin-top:10px;
+                border-radius:8px;
+                background:#fafafa;
+            ">
+                <strong>📱 ${candidate.phone}</strong><br>
+                <small>Last message: ${candidate.lastMessage}</small>
+            </div>
+        `).join("");
+
+    } catch (error) {
+
+        showResult("❌ " + error.message, false);
+
+    }
+}
 function showResult(message, success) {
 
     const result = document.getElementById("result");
