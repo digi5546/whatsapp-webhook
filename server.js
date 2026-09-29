@@ -262,6 +262,13 @@ function checkAdmin(req, res, next) {
 }
 
 // ===============================
+// CANDIDATE LIST API
+// ===============================
+
+app.get("/api/candidates", checkAdmin, (req, res) => {
+    res.json(Object.values(candidates));
+});
+// ===============================
 // HR PANEL
 // ===============================
 
