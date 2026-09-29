@@ -8,8 +8,12 @@ const VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN;
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
 const ADMIN_PANEL_KEY = process.env.ADMIN_PANEL_KEY;
-
 const GRAPH_API_VERSION = "v25.0";
+// ===============================
+// CANDIDATE DATA
+// ===============================
+
+const candidates = {};
 
 // ===============================
 // HOME
