@@ -75,6 +75,24 @@ async function initializeDatabase() {
         ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT ''
     `);
 
+    // Store candidate message history
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS candidate_messages (
+            id BIGSERIAL PRIMARY KEY,
+            phone TEXT NOT NULL,
+            direction TEXT NOT NULL,
+            message TEXT NOT NULL,
+            message_type TEXT DEFAULT 'text',
+            whatsapp_message_id TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    `);
+
+    await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_candidate_messages_phone_created
+        ON candidate_messages (phone, created_at DESC)
+    `);
+
     console.log("PostgreSQL database initialized successfully.");
 }
 
@@ -99,6 +117,36 @@ async function saveCandidate(phone) {
     } catch (error) {
         console.error(
             "Failed to save candidate to PostgreSQL:",
+            error.message
+        );
+    }
+}
+
+async function saveCandidateMessage(
+    phone,
+    direction,
+    message,
+    messageType = "text",
+    whatsappMessageId = null
+) {
+    try {
+        await pool.query(
+            `
+            INSERT INTO candidate_messages
+                (phone, direction, message, message_type, whatsapp_message_id)
+            VALUES ($1, $2, $3, $4, $5)
+            `,
+            [
+                phone,
+                direction,
+                message,
+                messageType,
+                whatsappMessageId
+            ]
+        );
+    } catch (error) {
+        console.error(
+            "Failed to save candidate message:",
             error.message
         );
     }
@@ -161,6 +209,16 @@ async function sendWhatsAppMessage(to, text) {
         throw new Error(JSON.stringify(data));
     }
 
+    await saveCandidateMessage(
+        to,
+        "outgoing",
+        text,
+        "text",
+        data.messages && data.messages[0]
+            ? data.messages[0].id
+            : null
+    );
+
     return data;
 }
 
@@ -203,6 +261,16 @@ async function sendWhatsAppTemplate(to) {
     if (!response.ok) {
         throw new Error(JSON.stringify(data));
     }
+
+    await saveCandidateMessage(
+        to,
+        "outgoing",
+        "[sales_trainee_update template sent]",
+        "template",
+        data.messages && data.messages[0]
+            ? data.messages[0].id
+            : null
+    );
 
     return data;
 }
@@ -325,6 +393,20 @@ app.post("/webhook", (req, res) => {
                         // ===============================
 
                         saveCandidate(message.from);
+
+                        // Save incoming message to history
+                        const incomingMessageText =
+                            message.type === "text"
+                                ? message.text.body
+                                : "[" + message.type + " message]";
+
+                        saveCandidateMessage(
+                            message.from,
+                            "incoming",
+                            incomingMessageText,
+                            message.type,
+                            message.id || null
+                        );
 
                         // ===============================
                         // TEXT MESSAGE
@@ -548,6 +630,64 @@ app.put(
             res.status(500).json({
                 error:
                     "Failed to update candidate."
+            });
+        }
+    }
+);
+
+// ===============================
+// CANDIDATE MESSAGE HISTORY API
+// ===============================
+
+app.get(
+    "/api/candidates/:phone/messages",
+    checkAdmin,
+    async (req, res) => {
+
+        try {
+
+            const phone =
+                String(
+                    req.params.phone || ""
+                ).replace(/\\D/g, "");
+
+            if (!phone) {
+                return res
+                    .status(400)
+                    .json({
+                        error:
+                            "Candidate WhatsApp number is required."
+                    });
+            }
+
+            const result =
+                await pool.query(
+                    `
+                    SELECT
+                        id,
+                        direction,
+                        message,
+                        message_type AS "messageType",
+                        created_at AS "createdAt"
+                    FROM candidate_messages
+                    WHERE phone = $1
+                    ORDER BY created_at ASC
+                    `,
+                    [phone]
+                );
+
+            res.json(result.rows);
+
+        } catch (error) {
+
+            console.error(
+                "Failed to load candidate messages:",
+                error.message
+            );
+
+            res.status(500).json({
+                error:
+                    "Failed to load candidate messages."
             });
         }
     }
