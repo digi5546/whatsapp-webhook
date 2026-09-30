@@ -639,30 +639,68 @@ app.get("/hr", (req, res) => {
 
         }
 
-        .candidate {
-
-            border: 1px solid #ddd;
-            padding: 15px;
+        .table-wrap {
+            overflow-x: auto;
             margin-top: 15px;
+            border: 1px solid #ddd;
             border-radius: 10px;
-            background: #fafafa;
-
+            background: #fff;
         }
 
-        .candidate-title {
+        .candidate-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1050px;
+        }
 
-            font-size: 18px;
+        .candidate-table th,
+        .candidate-table td {
+            border-bottom: 1px solid #e5e5e5;
+            padding: 10px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .candidate-table th {
+            background: #f3f4f6;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+        .candidate-table td {
+            font-size: 13px;
+        }
+
+        .candidate-table input,
+        .candidate-table select,
+        .candidate-table textarea {
+            margin: 0;
+            min-width: 150px;
+        }
+
+        .candidate-table textarea {
+            min-height: 70px;
+        }
+
+        .candidate-table .phone-cell {
             font-weight: bold;
-            margin-bottom: 5px;
-
+            white-space: nowrap;
         }
 
-        .last-message {
-
-            font-size: 12px;
+        .candidate-table .date-cell {
             color: #666;
-            margin-bottom: 15px;
+            font-size: 12px;
+            white-space: nowrap;
+        }
 
+        .candidate-table .save-cell {
+            min-width: 130px;
+        }
+
+        .candidate-table .save {
+            width: auto;
+            margin: 0;
+            white-space: nowrap;
         }
 
         #result {
@@ -1002,6 +1040,23 @@ async function loadCandidates() {
         }
 
         container.innerHTML =
+            `
+            <div class="table-wrap">
+                <table class="candidate-table">
+                    <thead>
+                        <tr>
+                            <th>WhatsApp Number</th>
+                            <th>Last Message</th>
+                            <th>Candidate Name</th>
+                            <th>Application Status</th>
+                            <th>Onboarding Status</th>
+                            <th>Interview Status</th>
+                            <th>HR Notes</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            ` +
             data.map(function(candidate) {
 
                 const phone =
@@ -1042,145 +1097,142 @@ async function loadCandidates() {
                         candidate.lastMessage
                     );
 
-                return \`
+                return `
 
-                    <div class="candidate">
+                        <tr>
 
-                        <div class="candidate-title">
-                            📱 \${phone}
-                        </div>
+                            <td class="phone-cell">
+                                📱 ${phone}
+                            </td>
 
-                        <div class="last-message">
-                            Last message: \${lastMessage}
-                        </div>
+                            <td class="date-cell">
+                                ${lastMessage}
+                            </td>
 
-                        <label>
-                            Candidate Name
-                        </label>
+                            <td>
+                                <input
+                                    type="text"
+                                    id="name-${phone}"
+                                    value="${name}"
+                                    placeholder="Candidate name"
+                                >
+                            </td>
 
-                        <input
-                            type="text"
-                            id="name-\${phone}"
-                            value="\${name}"
-                            placeholder="Enter candidate name"
-                        >
+                            <td>
+                                <select id="status-${phone}">
 
-                        <label>
-                            Application Status
-                        </label>
+                                    <option value="New"
+                                        ${status === "New" ? "selected" : ""}>
+                                        New
+                                    </option>
 
-                        <select id="status-\${phone}">
+                                    <option value="Screening"
+                                        ${status === "Screening" ? "selected" : ""}>
+                                        Screening
+                                    </option>
 
-                            <option value="New"
-                                \${status === "New" ? "selected" : ""}>
-                                New
-                            </option>
+                                    <option value="Shortlisted"
+                                        ${status === "Shortlisted" ? "selected" : ""}>
+                                        Shortlisted
+                                    </option>
 
-                            <option value="Screening"
-                                \${status === "Screening" ? "selected" : ""}>
-                                Screening
-                            </option>
+                                    <option value="Rejected"
+                                        ${status === "Rejected" ? "selected" : ""}>
+                                        Rejected
+                                    </option>
 
-                            <option value="Shortlisted"
-                                \${status === "Shortlisted" ? "selected" : ""}>
-                                Shortlisted
-                            </option>
+                                    <option value="Selected"
+                                        ${status === "Selected" ? "selected" : ""}>
+                                        Selected
+                                    </option>
 
-                            <option value="Rejected"
-                                \${status === "Rejected" ? "selected" : ""}>
-                                Rejected
-                            </option>
+                                </select>
+                            </td>
 
-                            <option value="Selected"
-                                \${status === "Selected" ? "selected" : ""}>
-                                Selected
-                            </option>
+                            <td>
+                                <select id="onboarding-${phone}">
 
-                        </select>
+                                    <option value="Pending"
+                                        ${onboardingStatus === "Pending" ? "selected" : ""}>
+                                        Pending
+                                    </option>
 
-                        <label>
-                            Onboarding Status
-                        </label>
+                                    <option value="Form Sent"
+                                        ${onboardingStatus === "Form Sent" ? "selected" : ""}>
+                                        Form Sent
+                                    </option>
 
-                        <select id="onboarding-\${phone}">
+                                    <option value="Form Received"
+                                        ${onboardingStatus === "Form Received" ? "selected" : ""}>
+                                        Form Received
+                                    </option>
 
-                            <option value="Pending"
-                                \${onboardingStatus === "Pending" ? "selected" : ""}>
-                                Pending
-                            </option>
+                                    <option value="Completed"
+                                        ${onboardingStatus === "Completed" ? "selected" : ""}>
+                                        Completed
+                                    </option>
 
-                            <option value="Form Sent"
-                                \${onboardingStatus === "Form Sent" ? "selected" : ""}>
-                                Form Sent
-                            </option>
+                                </select>
+                            </td>
 
-                            <option value="Form Received"
-                                \${onboardingStatus === "Form Received" ? "selected" : ""}>
-                                Form Received
-                            </option>
+                            <td>
+                                <select id="interview-${phone}">
 
-                            <option value="Completed"
-                                \${onboardingStatus === "Completed" ? "selected" : ""}>
-                                Completed
-                            </option>
+                                    <option value="Not Scheduled"
+                                        ${interviewStatus === "Not Scheduled" ? "selected" : ""}>
+                                        Not Scheduled
+                                    </option>
 
-                        </select>
+                                    <option value="Scheduled"
+                                        ${interviewStatus === "Scheduled" ? "selected" : ""}>
+                                        Scheduled
+                                    </option>
 
-                        <label>
-                            Interview Status
-                        </label>
+                                    <option value="Completed"
+                                        ${interviewStatus === "Completed" ? "selected" : ""}>
+                                        Completed
+                                    </option>
 
-                        <select id="interview-\${phone}">
+                                    <option value="Selected"
+                                        ${interviewStatus === "Selected" ? "selected" : ""}>
+                                        Selected
+                                    </option>
 
-                            <option value="Not Scheduled"
-                                \${interviewStatus === "Not Scheduled" ? "selected" : ""}>
-                                Not Scheduled
-                            </option>
+                                    <option value="Rejected"
+                                        ${interviewStatus === "Rejected" ? "selected" : ""}>
+                                        Rejected
+                                    </option>
 
-                            <option value="Scheduled"
-                                \${interviewStatus === "Scheduled" ? "selected" : ""}>
-                                Scheduled
-                            </option>
+                                </select>
+                            </td>
 
-                            <option value="Completed"
-                                \${interviewStatus === "Completed" ? "selected" : ""}>
-                                Completed
-                            </option>
+                            <td>
+                                <textarea
+                                    id="notes-${phone}"
+                                    placeholder="HR notes..."
+                                >${notes}</textarea>
+                            </td>
 
-                            <option value="Selected"
-                                \${interviewStatus === "Selected" ? "selected" : ""}>
-                                Selected
-                            </option>
+                            <td class="save-cell">
+                                <button
+                                    type="button"
+                                    class="save"
+                                    onclick="window.saveCandidate('${phone}')"
+                                >
+                                    💾 Save
+                                </button>
+                            </td>
 
-                            <option value="Rejected"
-                                \${interviewStatus === "Rejected" ? "selected" : ""}>
-                                Rejected
-                            </option>
+                        </tr>
 
-                        </select>
+                `;
 
-                        <label>
-                            HR Notes
-                        </label>
-
-                        <textarea
-                            id="notes-\${phone}"
-                            placeholder="Enter HR notes..."
-                        >\${notes}</textarea>
-
-                        <button
-                            type="button"
-                            class="save"
-                            onclick="window.saveCandidate('\${phone}')"
-                        >
-                            💾 Save Candidate
-                        </button>
-
-                    </div>
-
-                \`;
-
-            }).join("");
+            }).join("") +
+            `
+                    </tbody>
+                </table>
+            </div>
+            `;
 
         showResult(
             "✅ Candidates loaded successfully.",
