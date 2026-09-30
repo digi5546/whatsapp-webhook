@@ -1452,23 +1452,16 @@ window.saveCandidate = async function(phone) {
 
 window.viewCandidateDetails = function(phone) {
 
-    const rowButton =
-        document.querySelector(
-            'button[onclick="window.viewCandidateDetails(\\'' +
-            phone +
-            '\\')"]'
-        );
+    const nameInput =
+        document.getElementById("name-" + phone);
 
-    if (!rowButton) {
+    if (!nameInput) {
         showResult(
             "❌ Candidate row not found.",
             false
         );
         return;
     }
-
-    const nameInput =
-        document.getElementById("name-" + phone);
 
     const statusSelect =
         document.getElementById("status-" + phone);
@@ -1483,7 +1476,7 @@ window.viewCandidateDetails = function(phone) {
         document.getElementById("notes-" + phone);
 
     const row =
-        rowButton.closest("tr");
+        nameInput.closest("tr");
 
     const lastMessageCell =
         row.querySelector(".date-cell");
