@@ -1169,8 +1169,9 @@ async function loadCandidates() {
                         >\${notes}</textarea>
 
                         <button
+                            type="button"
                             class="save"
-                            onclick="saveCandidate('\${phone}')"
+                            onclick="window.saveCandidate('\${phone}')"
                         >
                             💾 Save Candidate
                         </button>
