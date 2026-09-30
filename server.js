@@ -968,6 +968,25 @@ app.get("/hr", (req, res) => {
             padding: 8px 0;
         }
 
+        .reply-box {
+            margin-top: 12px;
+            padding: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            background: #f9fafb;
+        }
+
+        .reply-box textarea {
+            min-height: 90px;
+            margin-bottom: 8px;
+        }
+
+        .reply-send {
+            background: #25D366;
+            color: white;
+            margin: 0;
+        }
+
         #result {
 
             margin-top: 20px;
@@ -1108,6 +1127,21 @@ app.get("/hr", (req, res) => {
         <label>💬 WhatsApp Message History</label>
         <div id="message-history" class="message-history">
             <div class="message-loading">Loading messages...</div>
+        </div>
+
+        <div class="reply-box">
+            <label>✍️ Reply to Candidate</label>
+            <textarea
+                id="candidate-reply"
+                placeholder="Type your WhatsApp reply here..."
+            ></textarea>
+            <button
+                type="button"
+                class="reply-send"
+                onclick="window.sendCandidateReply()"
+            >
+                📤 Send Reply
+            </button>
         </div>
 
         <div class="details-actions">
@@ -1804,6 +1838,104 @@ window.viewCandidateDetails = function(phone) {
         "block";
 
     loadCandidateMessages(phone);
+};
+
+
+window.sendCandidateReply = async function() {
+
+    const key =
+        document.getElementById("adminKey").value;
+
+    const phone =
+        document.getElementById("detail-phone").value;
+
+    const replyBox =
+        document.getElementById("candidate-reply");
+
+    const message =
+        replyBox.value.trim();
+
+    if (!key) {
+        showResult(
+            "Please enter HR panel key.",
+            false
+        );
+        return;
+    }
+
+    if (!phone) {
+        showResult(
+            "Candidate WhatsApp number is missing.",
+            false
+        );
+        return;
+    }
+
+    if (!message) {
+        showResult(
+            "Please type a reply message.",
+            false
+        );
+        return;
+    }
+
+    replyBox.disabled = true;
+
+    showResult(
+        "Sending WhatsApp reply...",
+        true
+    );
+
+    try {
+
+        const response =
+            await fetch(
+                "/api/send-text",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+                        "x-admin-key":
+                            key
+                    },
+                    body: JSON.stringify({
+                        phone: phone,
+                        message: message
+                    })
+                }
+            );
+
+        const data =
+            await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.error ||
+                "Failed to send WhatsApp reply"
+            );
+        }
+
+        replyBox.value = "";
+
+        showResult(
+            "✅ Reply sent successfully!",
+            true
+        );
+
+        await loadCandidateMessages(phone);
+
+    } catch (error) {
+
+        showResult(
+            "❌ " + error.message,
+            false
+        );
+
+    } finally {
+
+        replyBox.disabled = false;
+    }
 };
 
 
