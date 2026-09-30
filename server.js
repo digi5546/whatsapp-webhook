@@ -1040,200 +1040,128 @@ async function loadCandidates() {
         }
 
         container.innerHTML =
-            `
-            <div class="table-wrap">
-                <table class="candidate-table">
-                    <thead>
-                        <tr>
-                            <th>WhatsApp Number</th>
-                            <th>Last Message</th>
-                            <th>Candidate Name</th>
-                            <th>Application Status</th>
-                            <th>Onboarding Status</th>
-                            <th>Interview Status</th>
-                            <th>HR Notes</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            ` +
+            '<div class="table-wrap">' +
+            '<table class="candidate-table">' +
+            '<thead>' +
+            '<tr>' +
+            '<th>WhatsApp Number</th>' +
+            '<th>Last Message</th>' +
+            '<th>Candidate Name</th>' +
+            '<th>Application Status</th>' +
+            '<th>Onboarding Status</th>' +
+            '<th>Interview Status</th>' +
+            '<th>HR Notes</th>' +
+            '<th>Action</th>' +
+            '</tr>' +
+            '</thead>' +
+            '<tbody>' +
             data.map(function(candidate) {
 
                 const phone =
-                    escapeHtml(
-                        candidate.phone
-                    );
+                    escapeHtml(candidate.phone);
 
                 const name =
-                    escapeHtml(
-                        candidate.name
-                    );
+                    escapeHtml(candidate.name);
 
                 const status =
-                    escapeHtml(
-                        candidate.status ||
-                        "New"
-                    );
+                    escapeHtml(candidate.status || "New");
 
                 const onboardingStatus =
                     escapeHtml(
-                        candidate.onboardingStatus ||
-                        "Pending"
+                        candidate.onboardingStatus || "Pending"
                     );
 
                 const interviewStatus =
                     escapeHtml(
-                        candidate.interviewStatus ||
-                        "Not Scheduled"
+                        candidate.interviewStatus || "Not Scheduled"
                     );
 
                 const notes =
-                    escapeHtml(
-                        candidate.notes
-                    );
+                    escapeHtml(candidate.notes);
 
                 const lastMessage =
-                    escapeHtml(
-                        candidate.lastMessage
-                    );
+                    escapeHtml(candidate.lastMessage);
 
-                return `
-
-                        <tr>
-
-                            <td class="phone-cell">
-                                📱 ${phone}
-                            </td>
-
-                            <td class="date-cell">
-                                ${lastMessage}
-                            </td>
-
-                            <td>
-                                <input
-                                    type="text"
-                                    id="name-${phone}"
-                                    value="${name}"
-                                    placeholder="Candidate name"
-                                >
-                            </td>
-
-                            <td>
-                                <select id="status-${phone}">
-
-                                    <option value="New"
-                                        ${status === "New" ? "selected" : ""}>
-                                        New
-                                    </option>
-
-                                    <option value="Screening"
-                                        ${status === "Screening" ? "selected" : ""}>
-                                        Screening
-                                    </option>
-
-                                    <option value="Shortlisted"
-                                        ${status === "Shortlisted" ? "selected" : ""}>
-                                        Shortlisted
-                                    </option>
-
-                                    <option value="Rejected"
-                                        ${status === "Rejected" ? "selected" : ""}>
-                                        Rejected
-                                    </option>
-
-                                    <option value="Selected"
-                                        ${status === "Selected" ? "selected" : ""}>
-                                        Selected
-                                    </option>
-
-                                </select>
-                            </td>
-
-                            <td>
-                                <select id="onboarding-${phone}">
-
-                                    <option value="Pending"
-                                        ${onboardingStatus === "Pending" ? "selected" : ""}>
-                                        Pending
-                                    </option>
-
-                                    <option value="Form Sent"
-                                        ${onboardingStatus === "Form Sent" ? "selected" : ""}>
-                                        Form Sent
-                                    </option>
-
-                                    <option value="Form Received"
-                                        ${onboardingStatus === "Form Received" ? "selected" : ""}>
-                                        Form Received
-                                    </option>
-
-                                    <option value="Completed"
-                                        ${onboardingStatus === "Completed" ? "selected" : ""}>
-                                        Completed
-                                    </option>
-
-                                </select>
-                            </td>
-
-                            <td>
-                                <select id="interview-${phone}">
-
-                                    <option value="Not Scheduled"
-                                        ${interviewStatus === "Not Scheduled" ? "selected" : ""}>
-                                        Not Scheduled
-                                    </option>
-
-                                    <option value="Scheduled"
-                                        ${interviewStatus === "Scheduled" ? "selected" : ""}>
-                                        Scheduled
-                                    </option>
-
-                                    <option value="Completed"
-                                        ${interviewStatus === "Completed" ? "selected" : ""}>
-                                        Completed
-                                    </option>
-
-                                    <option value="Selected"
-                                        ${interviewStatus === "Selected" ? "selected" : ""}>
-                                        Selected
-                                    </option>
-
-                                    <option value="Rejected"
-                                        ${interviewStatus === "Rejected" ? "selected" : ""}>
-                                        Rejected
-                                    </option>
-
-                                </select>
-                            </td>
-
-                            <td>
-                                <textarea
-                                    id="notes-${phone}"
-                                    placeholder="HR notes..."
-                                >${notes}</textarea>
-                            </td>
-
-                            <td class="save-cell">
-                                <button
-                                    type="button"
-                                    class="save"
-                                    onclick="window.saveCandidate('${phone}')"
-                                >
-                                    💾 Save
-                                </button>
-                            </td>
-
-                        </tr>
-
-                `;
+                return '<tr>' +
+                    '<td class="phone-cell">📱 ' + phone + '</td>' +
+                    '<td class="date-cell">' + lastMessage + '</td>' +
+                    '<td>' +
+                        '<input type="text" id="name-' + phone +
+                        '" value="' + name +
+                        '" placeholder="Candidate name">' +
+                    '</td>' +
+                    '<td>' +
+                        '<select id="status-' + phone + '">' +
+                            '<option value="New"' +
+                                (status === "New" ? ' selected' : '') +
+                            '>New</option>' +
+                            '<option value="Screening"' +
+                                (status === "Screening" ? ' selected' : '') +
+                            '>Screening</option>' +
+                            '<option value="Shortlisted"' +
+                                (status === "Shortlisted" ? ' selected' : '') +
+                            '>Shortlisted</option>' +
+                            '<option value="Rejected"' +
+                                (status === "Rejected" ? ' selected' : '') +
+                            '>Rejected</option>' +
+                            '<option value="Selected"' +
+                                (status === "Selected" ? ' selected' : '') +
+                            '>Selected</option>' +
+                        '</select>' +
+                    '</td>' +
+                    '<td>' +
+                        '<select id="onboarding-' + phone + '">' +
+                            '<option value="Pending"' +
+                                (onboardingStatus === "Pending" ? ' selected' : '') +
+                            '>Pending</option>' +
+                            '<option value="Form Sent"' +
+                                (onboardingStatus === "Form Sent" ? ' selected' : '') +
+                            '>Form Sent</option>' +
+                            '<option value="Form Received"' +
+                                (onboardingStatus === "Form Received" ? ' selected' : '') +
+                            '>Form Received</option>' +
+                            '<option value="Completed"' +
+                                (onboardingStatus === "Completed" ? ' selected' : '') +
+                            '>Completed</option>' +
+                        '</select>' +
+                    '</td>' +
+                    '<td>' +
+                        '<select id="interview-' + phone + '">' +
+                            '<option value="Not Scheduled"' +
+                                (interviewStatus === "Not Scheduled" ? ' selected' : '') +
+                            '>Not Scheduled</option>' +
+                            '<option value="Scheduled"' +
+                                (interviewStatus === "Scheduled" ? ' selected' : '') +
+                            '>Scheduled</option>' +
+                            '<option value="Completed"' +
+                                (interviewStatus === "Completed" ? ' selected' : '') +
+                            '>Completed</option>' +
+                            '<option value="Selected"' +
+                                (interviewStatus === "Selected" ? ' selected' : '') +
+                            '>Selected</option>' +
+                            '<option value="Rejected"' +
+                                (interviewStatus === "Rejected" ? ' selected' : '') +
+                            '>Rejected</option>' +
+                        '</select>' +
+                    '</td>' +
+                    '<td>' +
+                        '<textarea id="notes-' + phone +
+                        '" placeholder="HR notes...">' +
+                        notes +
+                        '</textarea>' +
+                    '</td>' +
+                    '<td class="save-cell">' +
+                        '<button type="button" class="save" ' +
+                        'onclick="window.saveCandidate(\\'' + phone + '\\')">' +
+                        '💾 Save' +
+                        '</button>' +
+                    '</td>' +
+                '</tr>';
 
             }).join("") +
-            `
-                    </tbody>
-                </table>
-            </div>
-            `;
-
+            '</tbody>' +
+            '</table>' +
+            '</div>';
         showResult(
             "✅ Candidates loaded successfully.",
             true
