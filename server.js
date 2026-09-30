@@ -2929,8 +2929,117 @@ app.post(
 );
 
 // ===============================
+// SEND MANUAL TEXT FROM GOOGLE SHEET
+// ===============================
+
+app.post(
+    "/api/sheet-send-text",
+    async (req, res) => {
+
+        try {
+
+            const key =
+                req.headers["x-sheet-key"];
+
+            if (!SHEET_API_KEY) {
+                return res
+                    .status(500)
+                    .json({
+                        error:
+                            "SHEET_API_KEY is not configured."
+                    });
+            }
+
+            if (key !== SHEET_API_KEY) {
+                return res
+                    .status(401)
+                    .json({
+                        error:
+                            "Unauthorized"
+                    });
+            }
+
+            const phone =
+                String(
+                    req.body.phone || ""
+                ).replace(/\D/g, "");
+
+            const message =
+                String(
+                    req.body.message || ""
+                ).trim();
+
+            if (!phone) {
+                return res
+                    .status(400)
+                    .json({
+                        error:
+                            "Candidate WhatsApp number is required."
+                    });
+            }
+
+            if (!message) {
+                return res
+                    .status(400)
+                    .json({
+                        error:
+                            "Message is required."
+                    });
+            }
+
+            const windowStatus =
+                await getFreeFormWindowStatus(phone);
+
+            if (!windowStatus.allowed) {
+                return res
+                    .status(409)
+                    .json({
+                        error:
+                            windowStatus.reason +
+                            " Please send an approved WhatsApp template instead.",
+                        code:
+                            "WHATSAPP_24H_WINDOW_EXPIRED",
+                        lastIncomingAt:
+                            windowStatus.lastIncomingAt
+                    });
+            }
+
+            const result =
+                await sendWhatsAppMessage(
+                    phone,
+                    message
+                );
+
+            res.json({
+                success: true,
+                phone: phone,
+                messageId:
+                    result.messages &&
+                    result.messages[0]
+                        ? result.messages[0].id
+                        : null
+            });
+
+        } catch (error) {
+
+            console.error(
+                "Google Sheet text send failed:",
+                error.message
+            );
+
+            res.status(500).json({
+                error:
+                    error.message
+            });
+        }
+    }
+);
+
+// ===============================
 // SEND TEMPLATE FROM HR PANEL
 // ===============================
+
+
 
 app.post(
     "/api/send-template",
@@ -2985,6 +3094,60 @@ app.post(
 );
 
 // ===============================
+// 24-HOUR WHATSAPP WINDOW
+// ===============================
+
+async function getFreeFormWindowStatus(phone) {
+    const result = await pool.query(
+        `
+        SELECT created_at
+        FROM candidate_messages
+        WHERE phone = $1
+          AND direction = 'incoming'
+        ORDER BY created_at DESC
+        LIMIT 1
+        `,
+        [phone]
+    );
+
+    if (!result.rows.length) {
+        return {
+            allowed: false,
+            lastIncomingAt: null,
+            reason:
+                "No incoming WhatsApp message found for this candidate."
+        };
+    }
+
+    const lastIncomingAt =
+        new Date(result.rows[0].created_at);
+
+    const ageMs =
+        Date.now() - lastIncomingAt.getTime();
+
+    const windowMs =
+        24 * 60 * 60 * 1000;
+
+    if (ageMs < 0 || ageMs >= windowMs) {
+        return {
+            allowed: false,
+            lastIncomingAt:
+                lastIncomingAt.toISOString(),
+            reason:
+                "The 24-hour WhatsApp customer service window has expired."
+        };
+    }
+
+    return {
+        allowed: true,
+        lastIncomingAt:
+            lastIncomingAt.toISOString(),
+        remainingMs:
+            windowMs - ageMs
+    };
+}
+
+// ===============================
 // SEND TEXT FROM HR PANEL
 // ===============================
 
@@ -3022,6 +3185,25 @@ app.post(
                     .json({
                         error:
                             "Message is required."
+                    });
+            }
+
+            // Free-form text is allowed only while the
+            // candidate's 24-hour customer service window is open.
+            const windowStatus =
+                await getFreeFormWindowStatus(phone);
+
+            if (!windowStatus.allowed) {
+                return res
+                    .status(409)
+                    .json({
+                        error:
+                            windowStatus.reason +
+                            " Please send an approved WhatsApp template instead.",
+                        code:
+                            "WHATSAPP_24H_WINDOW_EXPIRED",
+                        lastIncomingAt:
+                            windowStatus.lastIncomingAt
                     });
             }
 
