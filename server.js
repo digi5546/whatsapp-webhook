@@ -678,7 +678,7 @@ app.get(
                     COALESCE(c.onboarding_status, 'Pending') AS "onboardingStatus",
                     COALESCE(c.interview_status, 'Not Scheduled') AS "interviewStatus",
                     COALESCE(c.notes, '') AS notes,
-                    COALESCE(c.last_message, '') AS "lastMessage",
+                    COALESCE(c.last_message::text, '') AS "lastMessage",
                     cm.message AS template,
                     cm.whatsapp_message_id AS "messageId",
                     cm.created_at AS "sentAt"
