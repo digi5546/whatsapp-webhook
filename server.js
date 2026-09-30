@@ -911,6 +911,71 @@ app.get("/hr", (req, res) => {
             white-space: nowrap;
         }
 
+        .category-panel {
+            margin-top: 12px;
+            padding: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            background: #f9fafb;
+        }
+
+        .category-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .category-button {
+            background: #111827;
+            color: white;
+            margin: 0;
+        }
+
+        .category-button.all {
+            background: #2563eb;
+        }
+
+        .category-button:hover {
+            opacity: 0.9;
+        }
+
+        .pagination {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+            margin-top: 14px;
+        }
+
+        .pagination button {
+            margin: 0;
+            padding: 8px 12px;
+            background: #e5e7eb;
+            color: #111827;
+        }
+
+        .pagination button.active {
+            background: #2563eb;
+            color: white;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .pagination-info {
+            margin-left: 6px;
+            color: #6b7280;
+            font-size: 13px;
+        }
+
+        .category-window-note {
+            margin-top: 8px;
+            color: #6b7280;
+            font-size: 13px;
+        }
+
         .details {
             background: #111827;
             color: white;
@@ -1136,23 +1201,47 @@ app.get("/hr", (req, res) => {
         🔄 Load Candidates
     </button>
 
-    <label>
-        🗂️ View by Category
-    </label>
-
-    <select id="categoryFilter" onchange="window.filterCandidatesByCategory()">
-        <option value="All">All Candidates</option>
-        <option value="New">New</option>
-        <option value="Shortlisted">Shortlisted</option>
-        <option value="Interview">Interview</option>
-        <option value="Selected">Selected</option>
-        <option value="Rejected">Rejected</option>
-        <option value="On Hold">On Hold</option>
-    </select>
+    <div class="category-panel">
+        <strong>🗂️ Candidate Categories</strong>
+        <div class="category-buttons" style="margin-top:10px;">
+            <button type="button" class="category-button all"
+                onclick="window.openCategoryWindow('All')">
+                All Candidates
+            </button>
+            <button type="button" class="category-button"
+                onclick="window.openCategoryWindow('New')">
+                New
+            </button>
+            <button type="button" class="category-button"
+                onclick="window.openCategoryWindow('Shortlisted')">
+                Shortlisted
+            </button>
+            <button type="button" class="category-button"
+                onclick="window.openCategoryWindow('Interview')">
+                Interview
+            </button>
+            <button type="button" class="category-button"
+                onclick="window.openCategoryWindow('Selected')">
+                Selected
+            </button>
+            <button type="button" class="category-button"
+                onclick="window.openCategoryWindow('Rejected')">
+                Rejected
+            </button>
+            <button type="button" class="category-button"
+                onclick="window.openCategoryWindow('On Hold')">
+                On Hold
+            </button>
+        </div>
+        <div class="category-window-note">
+            Har category alag browser tab/window mein open hogi.
+        </div>
+    </div>
 
     <div id="category-summary"></div>
 
     <div id="candidates"></div>
+    <div id="candidate-pagination" class="pagination"></div>
 
     <hr>
 
@@ -1645,7 +1734,11 @@ async function loadCandidates() {
 
         window.allCandidatesData = data;
 
-        window.renderCandidatesTable(data);
+        applyCategoryFromUrl();
+
+        window.filterCandidatesByCategory(
+            window.currentCandidateCategory || "All"
+        );
 
         showResult(
             "✅ Candidates loaded successfully.",
@@ -1663,6 +1756,113 @@ async function loadCandidates() {
 
 
 // ===============================
+// CANDIDATE PAGINATION
+// ===============================
+
+const CANDIDATES_PER_PAGE = 10;
+
+window.currentCandidatePage = 1;
+window.currentCandidateCategory = "All";
+
+function getCategoryFromUrl() {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        return params.get("category") || "All";
+    } catch (error) {
+        return "All";
+    }
+}
+
+window.openCategoryWindow = function(category) {
+    const url =
+        window.location.origin +
+        window.location.pathname +
+        "?category=" +
+        encodeURIComponent(category);
+
+    const newWindow = window.open(
+        url,
+        "_blank",
+        "noopener"
+    );
+
+    if (newWindow) {
+        newWindow.focus();
+    }
+};
+
+window.renderCandidatePagination = function(totalItems) {
+    const pagination =
+        document.getElementById("candidate-pagination");
+
+    if (!pagination) return;
+
+    const totalPages =
+        Math.ceil(totalItems / CANDIDATES_PER_PAGE);
+
+    if (totalPages <= 1) {
+        pagination.innerHTML = "";
+        return;
+    }
+
+    const currentPage =
+        window.currentCandidatePage;
+
+    let html = "";
+
+    html +=
+        '<button type="button" ' +
+        (currentPage === 1 ? "disabled" : "") +
+        ' onclick="window.goToCandidatePage(' +
+        (currentPage - 1) +
+        ')">← Previous</button>';
+
+    for (let page = 1; page <= totalPages; page++) {
+        html +=
+            '<button type="button" class="' +
+            (page === currentPage ? "active" : "") +
+            '" onclick="window.goToCandidatePage(' +
+            page +
+            ')">' +
+            page +
+            '</button>';
+    }
+
+    html +=
+        '<button type="button" ' +
+        (currentPage === totalPages ? "disabled" : "") +
+        ' onclick="window.goToCandidatePage(' +
+        (currentPage + 1) +
+        ')">Next →</button>';
+
+    html +=
+        '<span class="pagination-info">' +
+        "Page " + currentPage + " of " + totalPages +
+        " • " + totalItems + " candidates" +
+        "</span>";
+
+    pagination.innerHTML = html;
+};
+
+window.goToCandidatePage = function(page) {
+    const data =
+        window.currentCandidateDisplayData || [];
+
+    const totalPages =
+        Math.max(
+            1,
+            Math.ceil(data.length / CANDIDATES_PER_PAGE)
+        );
+
+    if (page < 1 || page > totalPages) return;
+
+    window.currentCandidatePage = page;
+    window.renderCandidatesTable(data);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+};
+
+
+// ===============================
 // RENDER / FILTER CANDIDATES
 // ===============================
 
@@ -1674,23 +1874,62 @@ window.renderCandidatesTable = function(data) {
     const summary =
         document.getElementById("category-summary");
 
+    const pagination =
+        document.getElementById("candidate-pagination");
+
     if (!data.length) {
         container.innerHTML =
             "<p>No candidates found in this category.</p>";
-        if (summary) summary.innerHTML = "";
+
+        if (summary) {
+            summary.innerHTML = "";
+        }
+
+        if (pagination) {
+            pagination.innerHTML = "";
+        }
+
         return;
     }
 
-    const counts = {};
-    data.forEach(function(candidate) {
-        const category = candidate.category || "New";
-        counts[category] = (counts[category] || 0) + 1;
-    });
+    window.currentCandidateDisplayData = data;
+
+    const totalPages =
+        Math.ceil(data.length / CANDIDATES_PER_PAGE);
+
+    if (
+        window.currentCandidatePage < 1 ||
+        window.currentCandidatePage > totalPages
+    ) {
+        window.currentCandidatePage = 1;
+    }
+
+    const startIndex =
+        (window.currentCandidatePage - 1) *
+        CANDIDATES_PER_PAGE;
+
+    const pageData =
+        data.slice(
+            startIndex,
+            startIndex + CANDIDATES_PER_PAGE
+        );
 
     if (summary) {
+        const category =
+            window.currentCandidateCategory || "All";
+
         summary.innerHTML =
-            "<p><strong>Showing " + data.length +
-            " candidate(s)</strong></p>";
+            "<p><strong>" +
+            (category === "All"
+                ? "All Candidates"
+                : escapeHtml(category)) +
+            "</strong> — showing " +
+            (startIndex + 1) +
+            "-" +
+            Math.min(startIndex + pageData.length, data.length) +
+            " of " +
+            data.length +
+            " candidate(s)</p>";
     }
 
     container.innerHTML =
@@ -1710,7 +1949,7 @@ window.renderCandidatesTable = function(data) {
             '</tr>' +
             '</thead>' +
             '<tbody>' +
-            data.map(function(candidate) {
+            pageData.map(function(candidate) {
 
                 const phone =
                     escapeHtml(candidate.phone);
@@ -1846,16 +2085,23 @@ window.renderCandidatesTable = function(data) {
             '</tbody>' +
             '</table>' +
             '</div>';
-}
+
+    window.renderCandidatePagination(data.length);
+};
 
 
-window.filterCandidatesByCategory = function() {
-
-    const filter =
-        document.getElementById("categoryFilter").value;
+window.filterCandidatesByCategory = function(category) {
 
     const allCandidates =
         window.allCandidatesData || [];
+
+    const filter =
+        category ||
+        getCategoryFromUrl() ||
+        "All";
+
+    window.currentCandidateCategory = filter;
+    window.currentCandidatePage = 1;
 
     const filtered =
         filter === "All"
@@ -1868,6 +2114,27 @@ window.filterCandidatesByCategory = function() {
 };
 
 
+// ===============================
+// OPEN CATEGORY FROM URL
+// ===============================
+
+function applyCategoryFromUrl() {
+    const category =
+        getCategoryFromUrl();
+
+    window.currentCandidateCategory =
+        category;
+
+    if (category !== "All") {
+        const heading =
+            document.querySelector("h3");
+
+        if (heading) {
+            heading.textContent =
+                "👥 Candidates — " + category;
+        }
+    }
+}
 // ===============================
 // SAVE CANDIDATE
 // ===============================
@@ -2410,6 +2677,10 @@ function showResult(
     result.innerText =
         message;
 }
+
+document.addEventListener("DOMContentLoaded", function() {
+    applyCategoryFromUrl();
+});
 
 </script>
 
