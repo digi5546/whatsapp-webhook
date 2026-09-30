@@ -49,6 +49,32 @@ async function initializeDatabase() {
         )
     `);
 
+    // Add HR management columns if they do not exist
+    await pool.query(`
+        ALTER TABLE candidates
+        ADD COLUMN IF NOT EXISTS name TEXT DEFAULT ''
+    `);
+
+    await pool.query(`
+        ALTER TABLE candidates
+        ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'New'
+    `);
+
+    await pool.query(`
+        ALTER TABLE candidates
+        ADD COLUMN IF NOT EXISTS onboarding_status TEXT DEFAULT 'Pending'
+    `);
+
+    await pool.query(`
+        ALTER TABLE candidates
+        ADD COLUMN IF NOT EXISTS interview_status TEXT DEFAULT 'Not Scheduled'
+    `);
+
+    await pool.query(`
+        ALTER TABLE candidates
+        ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT ''
+    `);
+
     console.log("PostgreSQL database initialized successfully.");
 }
 
@@ -121,11 +147,8 @@ async function sendWhatsAppMessage(to, text) {
 
         body: JSON.stringify({
             messaging_product: "whatsapp",
-
             to: to,
-
             type: "text",
-
             text: {
                 body: text
             }
@@ -285,7 +308,6 @@ app.post("/webhook", (req, res) => {
                     value.messages.forEach((message) => {
 
                         console.log("---------------");
-
                         console.log("MESSAGE RECEIVED");
 
                         console.log(
@@ -299,7 +321,7 @@ app.post("/webhook", (req, res) => {
                         );
 
                         // ===============================
-                        // SAVE CANDIDATE TO POSTGRES
+                        // SAVE CANDIDATE
                         // ===============================
 
                         saveCandidate(message.from);
@@ -410,6 +432,11 @@ app.get(
             const result = await pool.query(`
                 SELECT
                     phone,
+                    name,
+                    status,
+                    onboarding_status AS "onboardingStatus",
+                    interview_status AS "interviewStatus",
+                    notes,
                     last_message AS "lastMessage"
                 FROM candidates
                 ORDER BY last_message DESC
@@ -427,6 +454,100 @@ app.get(
             res.status(500).json({
                 error:
                     "Failed to load candidates."
+            });
+        }
+    }
+);
+
+// ===============================
+// UPDATE CANDIDATE
+// ===============================
+
+app.put(
+    "/api/candidates/:phone",
+    checkAdmin,
+    async (req, res) => {
+
+        try {
+
+            const phone =
+                String(
+                    req.params.phone || ""
+                ).replace(/\D/g, "");
+
+            if (!phone) {
+
+                return res
+                    .status(400)
+                    .json({
+                        error:
+                            "Candidate WhatsApp number is required."
+                    });
+            }
+
+            const name =
+                String(
+                    req.body.name || ""
+                ).trim();
+
+            const status =
+                String(
+                    req.body.status || "New"
+                ).trim();
+
+            const onboardingStatus =
+                String(
+                    req.body.onboardingStatus ||
+                    "Pending"
+                ).trim();
+
+            const interviewStatus =
+                String(
+                    req.body.interviewStatus ||
+                    "Not Scheduled"
+                ).trim();
+
+            const notes =
+                String(
+                    req.body.notes || ""
+                ).trim();
+
+            await pool.query(
+                `
+                UPDATE candidates
+                SET
+                    name = $1,
+                    status = $2,
+                    onboarding_status = $3,
+                    interview_status = $4,
+                    notes = $5
+                WHERE phone = $6
+                `,
+                [
+                    name,
+                    status,
+                    onboardingStatus,
+                    interviewStatus,
+                    notes,
+                    phone
+                ]
+            );
+
+            res.json({
+                success: true,
+                message: "Candidate updated successfully."
+            });
+
+        } catch (error) {
+
+            console.error(
+                "Failed to update candidate:",
+                error.message
+            );
+
+            res.status(500).json({
+                error:
+                    "Failed to update candidate."
             });
         }
     }
@@ -468,7 +589,8 @@ app.get("/hr", (req, res) => {
         }
 
         input,
-        textarea {
+        textarea,
+        select {
 
             width: 100%;
             padding: 12px;
@@ -481,7 +603,7 @@ app.get("/hr", (req, res) => {
         }
 
         textarea {
-            min-height: 150px;
+            min-height: 120px;
         }
 
         button {
@@ -506,6 +628,40 @@ app.get("/hr", (req, res) => {
 
             background: #333;
             color: white;
+
+        }
+
+        .save {
+
+            background: #2563eb;
+            color: white;
+            width: 100%;
+
+        }
+
+        .candidate {
+
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-top: 15px;
+            border-radius: 10px;
+            background: #fafafa;
+
+        }
+
+        .candidate-title {
+
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 5px;
+
+        }
+
+        .last-message {
+
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 15px;
 
         }
 
@@ -595,6 +751,25 @@ app.get("/hr", (req, res) => {
 </div>
 
 <script>
+
+// ===============================
+// ESCAPE HTML
+// ===============================
+
+function escapeHtml(value) {
+
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+
+// ===============================
+// SEND TEMPLATE
+// ===============================
 
 async function sendTemplate() {
 
@@ -829,31 +1004,299 @@ async function loadCandidates() {
         container.innerHTML =
             data.map(function(candidate) {
 
-                return (
+                const phone =
+                    escapeHtml(
+                        candidate.phone
+                    );
 
-                    '<div style="' +
-                    'border:1px solid #ddd;' +
-                    'padding:12px;' +
-                    'margin-top:10px;' +
-                    'border-radius:8px;' +
-                    'background:#fafafa;">' +
+                const name =
+                    escapeHtml(
+                        candidate.name
+                    );
 
-                    '<strong>📱 ' +
-                    candidate.phone +
-                    '</strong><br>' +
+                const status =
+                    escapeHtml(
+                        candidate.status ||
+                        "New"
+                    );
 
-                    '<small>Last message: ' +
-                    candidate.lastMessage +
-                    '</small>' +
+                const onboardingStatus =
+                    escapeHtml(
+                        candidate.onboardingStatus ||
+                        "Pending"
+                    );
 
-                    '</div>'
+                const interviewStatus =
+                    escapeHtml(
+                        candidate.interviewStatus ||
+                        "Not Scheduled"
+                    );
 
-                );
+                const notes =
+                    escapeHtml(
+                        candidate.notes
+                    );
+
+                const lastMessage =
+                    escapeHtml(
+                        candidate.lastMessage
+                    );
+
+                return `
+
+                    <div class="candidate">
+
+                        <div class="candidate-title">
+                            📱 ${phone}
+                        </div>
+
+                        <div class="last-message">
+                            Last message: ${lastMessage}
+                        </div>
+
+                        <label>
+                            Candidate Name
+                        </label>
+
+                        <input
+                            type="text"
+                            id="name-${phone}"
+                            value="${name}"
+                            placeholder="Enter candidate name"
+                        >
+
+                        <label>
+                            Application Status
+                        </label>
+
+                        <select id="status-${phone}">
+
+                            <option value="New"
+                                ${status === "New" ? "selected" : ""}>
+                                New
+                            </option>
+
+                            <option value="Screening"
+                                ${status === "Screening" ? "selected" : ""}>
+                                Screening
+                            </option>
+
+                            <option value="Shortlisted"
+                                ${status === "Shortlisted" ? "selected" : ""}>
+                                Shortlisted
+                            </option>
+
+                            <option value="Rejected"
+                                ${status === "Rejected" ? "selected" : ""}>
+                                Rejected
+                            </option>
+
+                            <option value="Selected"
+                                ${status === "Selected" ? "selected" : ""}>
+                                Selected
+                            </option>
+
+                        </select>
+
+                        <label>
+                            Onboarding Status
+                        </label>
+
+                        <select id="onboarding-${phone}">
+
+                            <option value="Pending"
+                                ${onboardingStatus === "Pending" ? "selected" : ""}>
+                                Pending
+                            </option>
+
+                            <option value="Form Sent"
+                                ${onboardingStatus === "Form Sent" ? "selected" : ""}>
+                                Form Sent
+                            </option>
+
+                            <option value="Form Received"
+                                ${onboardingStatus === "Form Received" ? "selected" : ""}>
+                                Form Received
+                            </option>
+
+                            <option value="Completed"
+                                ${onboardingStatus === "Completed" ? "selected" : ""}>
+                                Completed
+                            </option>
+
+                        </select>
+
+                        <label>
+                            Interview Status
+                        </label>
+
+                        <select id="interview-${phone}">
+
+                            <option value="Not Scheduled"
+                                ${interviewStatus === "Not Scheduled" ? "selected" : ""}>
+                                Not Scheduled
+                            </option>
+
+                            <option value="Scheduled"
+                                ${interviewStatus === "Scheduled" ? "selected" : ""}>
+                                Scheduled
+                            </option>
+
+                            <option value="Completed"
+                                ${interviewStatus === "Completed" ? "selected" : ""}>
+                                Completed
+                            </option>
+
+                            <option value="Selected"
+                                ${interviewStatus === "Selected" ? "selected" : ""}>
+                                Selected
+                            </option>
+
+                            <option value="Rejected"
+                                ${interviewStatus === "Rejected" ? "selected" : ""}>
+                                Rejected
+                            </option>
+
+                        </select>
+
+                        <label>
+                            HR Notes
+                        </label>
+
+                        <textarea
+                            id="notes-${phone}"
+                            placeholder="Enter HR notes..."
+                        >${notes}</textarea>
+
+                        <button
+                            class="save"
+                            onclick="saveCandidate('${phone}')"
+                        >
+                            💾 Save Candidate
+                        </button>
+
+                    </div>
+
+                `;
 
             }).join("");
 
         showResult(
             "✅ Candidates loaded successfully.",
+            true
+        );
+
+    } catch (error) {
+
+        showResult(
+            "❌ " + error.message,
+            false
+        );
+    }
+}
+
+
+// ===============================
+// SAVE CANDIDATE
+// ===============================
+
+async function saveCandidate(phone) {
+
+    const key =
+        document.getElementById(
+            "adminKey"
+        ).value;
+
+    const name =
+        document.getElementById(
+            "name-" + phone
+        ).value;
+
+    const status =
+        document.getElementById(
+            "status-" + phone
+        ).value;
+
+    const onboardingStatus =
+        document.getElementById(
+            "onboarding-" + phone
+        ).value;
+
+    const interviewStatus =
+        document.getElementById(
+            "interview-" + phone
+        ).value;
+
+    const notes =
+        document.getElementById(
+            "notes-" + phone
+        ).value;
+
+    if (!key) {
+
+        showResult(
+            "Please enter HR panel key.",
+            false
+        );
+
+        return;
+    }
+
+    showResult(
+        "Saving candidate...",
+        true
+    );
+
+    try {
+
+        const response =
+            await fetch(
+                "/api/candidates/" +
+                encodeURIComponent(phone),
+                {
+                    method: "PUT",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+
+                        "x-admin-key":
+                            key
+                    },
+
+                    body: JSON.stringify({
+
+                        name:
+                            name,
+
+                        status:
+                            status,
+
+                        onboardingStatus:
+                            onboardingStatus,
+
+                        interviewStatus:
+                            interviewStatus,
+
+                        notes:
+                            notes
+                    })
+                }
+            );
+
+        const data =
+            await response.json();
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.error ||
+                "Failed to save candidate"
+            );
+        }
+
+        showResult(
+            "✅ Candidate saved successfully!",
             true
         );
 
