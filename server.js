@@ -1042,16 +1042,16 @@ async function loadCandidates() {
                         candidate.lastMessage
                     );
 
-                return `
+                return \`
 
                     <div class="candidate">
 
                         <div class="candidate-title">
-                            📱 ${phone}
+                            📱 \${phone}
                         </div>
 
                         <div class="last-message">
-                            Last message: ${lastMessage}
+                            Last message: \${lastMessage}
                         </div>
 
                         <label>
@@ -1060,8 +1060,8 @@ async function loadCandidates() {
 
                         <input
                             type="text"
-                            id="name-${phone}"
-                            value="${name}"
+                            id="name-\${phone}"
+                            value="\${name}"
                             placeholder="Enter candidate name"
                         >
 
@@ -1069,30 +1069,30 @@ async function loadCandidates() {
                             Application Status
                         </label>
 
-                        <select id="status-${phone}">
+                        <select id="status-\${phone}">
 
                             <option value="New"
-                                ${status === "New" ? "selected" : ""}>
+                                \${status === "New" ? "selected" : ""}>
                                 New
                             </option>
 
                             <option value="Screening"
-                                ${status === "Screening" ? "selected" : ""}>
+                                \${status === "Screening" ? "selected" : ""}>
                                 Screening
                             </option>
 
                             <option value="Shortlisted"
-                                ${status === "Shortlisted" ? "selected" : ""}>
+                                \${status === "Shortlisted" ? "selected" : ""}>
                                 Shortlisted
                             </option>
 
                             <option value="Rejected"
-                                ${status === "Rejected" ? "selected" : ""}>
+                                \${status === "Rejected" ? "selected" : ""}>
                                 Rejected
                             </option>
 
                             <option value="Selected"
-                                ${status === "Selected" ? "selected" : ""}>
+                                \${status === "Selected" ? "selected" : ""}>
                                 Selected
                             </option>
 
@@ -1102,25 +1102,25 @@ async function loadCandidates() {
                             Onboarding Status
                         </label>
 
-                        <select id="onboarding-${phone}">
+                        <select id="onboarding-\${phone}">
 
                             <option value="Pending"
-                                ${onboardingStatus === "Pending" ? "selected" : ""}>
+                                \${onboardingStatus === "Pending" ? "selected" : ""}>
                                 Pending
                             </option>
 
                             <option value="Form Sent"
-                                ${onboardingStatus === "Form Sent" ? "selected" : ""}>
+                                \${onboardingStatus === "Form Sent" ? "selected" : ""}>
                                 Form Sent
                             </option>
 
                             <option value="Form Received"
-                                ${onboardingStatus === "Form Received" ? "selected" : ""}>
+                                \${onboardingStatus === "Form Received" ? "selected" : ""}>
                                 Form Received
                             </option>
 
                             <option value="Completed"
-                                ${onboardingStatus === "Completed" ? "selected" : ""}>
+                                \${onboardingStatus === "Completed" ? "selected" : ""}>
                                 Completed
                             </option>
 
@@ -1130,30 +1130,30 @@ async function loadCandidates() {
                             Interview Status
                         </label>
 
-                        <select id="interview-${phone}">
+                        <select id="interview-\${phone}">
 
                             <option value="Not Scheduled"
-                                ${interviewStatus === "Not Scheduled" ? "selected" : ""}>
+                                \${interviewStatus === "Not Scheduled" ? "selected" : ""}>
                                 Not Scheduled
                             </option>
 
                             <option value="Scheduled"
-                                ${interviewStatus === "Scheduled" ? "selected" : ""}>
+                                \${interviewStatus === "Scheduled" ? "selected" : ""}>
                                 Scheduled
                             </option>
 
                             <option value="Completed"
-                                ${interviewStatus === "Completed" ? "selected" : ""}>
+                                \${interviewStatus === "Completed" ? "selected" : ""}>
                                 Completed
                             </option>
 
                             <option value="Selected"
-                                ${interviewStatus === "Selected" ? "selected" : ""}>
+                                \${interviewStatus === "Selected" ? "selected" : ""}>
                                 Selected
                             </option>
 
                             <option value="Rejected"
-                                ${interviewStatus === "Rejected" ? "selected" : ""}>
+                                \${interviewStatus === "Rejected" ? "selected" : ""}>
                                 Rejected
                             </option>
 
@@ -1164,22 +1164,20 @@ async function loadCandidates() {
                         </label>
 
                         <textarea
-                            id="notes-${phone}"
+                            id="notes-\${phone}"
                             placeholder="Enter HR notes..."
-                        >${notes}</textarea>
+                        >\${notes}</textarea>
 
                         <button
                             class="save"
-                            onclick="saveCandidate('${phone}')"
+                            onclick="saveCandidate('\${phone}')"
                         >
                             💾 Save Candidate
                         </button>
 
                     </div>
 
-                `;
-
-            }).join("");
+                \`;
 
         showResult(
             "✅ Candidates loaded successfully.",
