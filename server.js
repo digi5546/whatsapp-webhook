@@ -703,6 +703,84 @@ app.get("/hr", (req, res) => {
             white-space: nowrap;
         }
 
+        .details {
+            background: #111827;
+            color: white;
+            width: auto;
+            margin: 0 0 8px 0;
+            white-space: nowrap;
+        }
+
+        .details-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            z-index: 9999;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow-y: auto;
+        }
+
+        .details-box {
+            max-width: 650px;
+            margin: 40px auto;
+            background: white;
+            border-radius: 14px;
+            padding: 24px;
+            box-sizing: border-box;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+        }
+
+        .details-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .details-header h3 {
+            margin: 0;
+        }
+
+        .close-details {
+            background: #e5e7eb;
+            color: #111827;
+            margin: 0;
+        }
+
+        .details-box label {
+            display: block;
+            font-weight: bold;
+            margin-top: 12px;
+        }
+
+        .details-box input,
+        .details-box select,
+        .details-box textarea {
+            width: 100%;
+            box-sizing: border-box;
+            margin-top: 6px;
+            margin-bottom: 10px;
+            padding: 11px;
+        }
+
+        .details-box textarea {
+            min-height: 110px;
+        }
+
+        .details-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .details-save {
+            background: #2563eb;
+            color: white;
+        }
+
         #result {
 
             margin-top: 20px;
@@ -786,6 +864,79 @@ app.get("/hr", (req, res) => {
 
     <div id="candidates"></div>
 
+</div>
+
+<div id="candidateModal" class="details-modal">
+    <div class="details-box">
+
+        <div class="details-header">
+            <h3>👤 Candidate Details</h3>
+            <button
+                type="button"
+                class="close-details"
+                onclick="window.closeCandidateDetails()"
+            >
+                ✕ Close
+            </button>
+        </div>
+
+        <label>WhatsApp Number</label>
+        <input type="text" id="detail-phone" readonly>
+
+        <label>Last Message</label>
+        <input type="text" id="detail-last-message" readonly>
+
+        <label>Candidate Name</label>
+        <input type="text" id="detail-name" placeholder="Candidate name">
+
+        <label>Application Status</label>
+        <select id="detail-status">
+            <option value="New">New</option>
+            <option value="Screening">Screening</option>
+            <option value="Shortlisted">Shortlisted</option>
+            <option value="Rejected">Rejected</option>
+            <option value="Selected">Selected</option>
+        </select>
+
+        <label>Onboarding Status</label>
+        <select id="detail-onboarding">
+            <option value="Pending">Pending</option>
+            <option value="Form Sent">Form Sent</option>
+            <option value="Form Received">Form Received</option>
+            <option value="Completed">Completed</option>
+        </select>
+
+        <label>Interview Status</label>
+        <select id="detail-interview">
+            <option value="Not Scheduled">Not Scheduled</option>
+            <option value="Scheduled">Scheduled</option>
+            <option value="Completed">Completed</option>
+            <option value="Selected">Selected</option>
+            <option value="Rejected">Rejected</option>
+        </select>
+
+        <label>HR Notes</label>
+        <textarea id="detail-notes" placeholder="HR notes..."></textarea>
+
+        <div class="details-actions">
+            <button
+                type="button"
+                class="details-save"
+                onclick="window.saveCandidateDetails()"
+            >
+                💾 Save Details
+            </button>
+
+            <button
+                type="button"
+                class="close-details"
+                onclick="window.closeCandidateDetails()"
+            >
+                Cancel
+            </button>
+        </div>
+
+    </div>
 </div>
 
 <script>
@@ -1151,6 +1302,10 @@ async function loadCandidates() {
                         '</textarea>' +
                     '</td>' +
                     '<td class="save-cell">' +
+                        '<button type="button" class="details" ' +
+                        'onclick="window.viewCandidateDetails(\\'' + phone + '\\')">' +
+                        '👁 View' +
+                        '</button>' +
                         '<button type="button" class="save" ' +
                         'onclick="window.saveCandidate(\\'' + phone + '\\')">' +
                         '💾 Save' +
@@ -1289,6 +1444,199 @@ window.saveCandidate = async function(phone) {
         );
     }
 }
+
+
+// ===============================
+// CANDIDATE DETAILED VIEW
+// ===============================
+
+window.viewCandidateDetails = function(phone) {
+
+    const rowButton =
+        document.querySelector(
+            'button[onclick="window.viewCandidateDetails(\\'' +
+            phone +
+            '\\')"]'
+        );
+
+    if (!rowButton) {
+        showResult(
+            "❌ Candidate row not found.",
+            false
+        );
+        return;
+    }
+
+    const nameInput =
+        document.getElementById("name-" + phone);
+
+    const statusSelect =
+        document.getElementById("status-" + phone);
+
+    const onboardingSelect =
+        document.getElementById("onboarding-" + phone);
+
+    const interviewSelect =
+        document.getElementById("interview-" + phone);
+
+    const notesInput =
+        document.getElementById("notes-" + phone);
+
+    const row =
+        rowButton.closest("tr");
+
+    const lastMessageCell =
+        row.querySelector(".date-cell");
+
+    document.getElementById("detail-phone").value =
+        phone;
+
+    document.getElementById("detail-last-message").value =
+        lastMessageCell
+            ? lastMessageCell.innerText
+            : "";
+
+    document.getElementById("detail-name").value =
+        nameInput ? nameInput.value : "";
+
+    document.getElementById("detail-status").value =
+        statusSelect ? statusSelect.value : "New";
+
+    document.getElementById("detail-onboarding").value =
+        onboardingSelect
+            ? onboardingSelect.value
+            : "Pending";
+
+    document.getElementById("detail-interview").value =
+        interviewSelect
+            ? interviewSelect.value
+            : "Not Scheduled";
+
+    document.getElementById("detail-notes").value =
+        notesInput ? notesInput.value : "";
+
+    document.getElementById("candidateModal").style.display =
+        "block";
+};
+
+
+window.closeCandidateDetails = function() {
+
+    document.getElementById("candidateModal").style.display =
+        "none";
+};
+
+
+window.saveCandidateDetails = async function() {
+
+    const key =
+        document.getElementById("adminKey").value;
+
+    const phone =
+        document.getElementById("detail-phone").value;
+
+    const name =
+        document.getElementById("detail-name").value;
+
+    const status =
+        document.getElementById("detail-status").value;
+
+    const onboardingStatus =
+        document.getElementById("detail-onboarding").value;
+
+    const interviewStatus =
+        document.getElementById("detail-interview").value;
+
+    const notes =
+        document.getElementById("detail-notes").value;
+
+    if (!key) {
+        showResult(
+            "Please enter HR panel key.",
+            false
+        );
+        return;
+    }
+
+    showResult(
+        "Saving candidate details...",
+        true
+    );
+
+    try {
+
+        const response =
+            await fetch(
+                "/api/candidates/" +
+                encodeURIComponent(phone),
+                {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+                        "x-admin-key":
+                            key
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        status: status,
+                        onboardingStatus:
+                            onboardingStatus,
+                        interviewStatus:
+                            interviewStatus,
+                        notes: notes
+                    })
+                }
+            );
+
+        const data =
+            await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.error ||
+                "Failed to save candidate"
+            );
+        }
+
+        const nameInput =
+            document.getElementById("name-" + phone);
+
+        const statusSelect =
+            document.getElementById("status-" + phone);
+
+        const onboardingSelect =
+            document.getElementById("onboarding-" + phone);
+
+        const interviewSelect =
+            document.getElementById("interview-" + phone);
+
+        const notesInput =
+            document.getElementById("notes-" + phone);
+
+        if (nameInput) nameInput.value = name;
+        if (statusSelect) statusSelect.value = status;
+        if (onboardingSelect)
+            onboardingSelect.value = onboardingStatus;
+        if (interviewSelect)
+            interviewSelect.value = interviewStatus;
+        if (notesInput) notesInput.value = notes;
+
+        window.closeCandidateDetails();
+
+        showResult(
+            "✅ Candidate saved successfully!",
+            true
+        );
+
+    } catch (error) {
+
+        showResult(
+            "❌ " + error.message,
+            false
+        );
+    }
+};
 
 
 // ===============================
