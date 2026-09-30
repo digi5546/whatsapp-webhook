@@ -673,6 +673,12 @@ app.get(
                 SELECT
                     cm.phone,
                     COALESCE(c.name, '') AS name,
+                    COALESCE(c.category, 'New') AS category,
+                    COALESCE(c.status, 'New') AS status,
+                    COALESCE(c.onboarding_status, 'Pending') AS "onboardingStatus",
+                    COALESCE(c.interview_status, 'Not Scheduled') AS "interviewStatus",
+                    COALESCE(c.notes, '') AS notes,
+                    COALESCE(c.last_message, '') AS "lastMessage",
                     cm.message AS template,
                     cm.whatsapp_message_id AS "messageId",
                     cm.created_at AS "sentAt"
@@ -1259,8 +1265,43 @@ app.get("/hr", (req, res) => {
         📋 Load Template Sent List
     </button>
 
+    <div class="category-panel">
+        <strong>📋 Approved Template Candidates</strong>
+        <div class="category-buttons" style="margin-top:10px;">
+            <button type="button" class="category-button all"
+                onclick="window.openTemplateCategoryWindow('All')">
+                All Candidates
+            </button>
+            <button type="button" class="category-button"
+                onclick="window.openTemplateCategoryWindow('New')">
+                New
+            </button>
+            <button type="button" class="category-button"
+                onclick="window.openTemplateCategoryWindow('Shortlisted')">
+                Shortlisted
+            </button>
+            <button type="button" class="category-button"
+                onclick="window.openTemplateCategoryWindow('Interview')">
+                Interview
+            </button>
+            <button type="button" class="category-button"
+                onclick="window.openTemplateCategoryWindow('Selected')">
+                Selected
+            </button>
+            <button type="button" class="category-button"
+                onclick="window.openTemplateCategoryWindow('Rejected')">
+                Rejected
+            </button>
+            <button type="button" class="category-button"
+                onclick="window.openTemplateCategoryWindow('On Hold')">
+                On Hold
+            </button>
+        </div>
+    </div>
+
     <div id="template-sent-summary"></div>
     <div id="template-sent"></div>
+    <div id="template-sent-pagination" class="pagination"></div>
 
 </div>
 
@@ -1552,112 +1593,210 @@ async function sendText() {
 // LOAD FIRST TEMPLATE SENT LIST
 // ===============================
 
-window.loadTemplateSent = async function() {
+window.templateSentData = [];
+window.templateSentPage = 1;
+window.templateSentCategory = "All";
 
-    const key =
-        document.getElementById("adminKey").value;
+window.renderTemplateSentPagination = function(totalItems) {
+    const pagination = document.getElementById("template-sent-pagination");
+    if (!pagination) return;
 
-    if (!key) {
-        showResult(
-            "Please enter HR panel key.",
-            false
-        );
+    const totalPages = Math.ceil(totalItems / CANDIDATES_PER_PAGE);
+
+    if (totalPages <= 1) {
+        pagination.innerHTML = "";
         return;
     }
 
-    const container =
-        document.getElementById("template-sent");
+    const currentPage = window.templateSentPage;
+    let html =
+        '<button type="button" ' +
+        (currentPage === 1 ? "disabled" : "") +
+        ' onclick="window.goToTemplateSentPage(' + (currentPage - 1) + ')">← Previous</button>';
 
-    const summary =
-        document.getElementById("template-sent-summary");
+    for (let page = 1; page <= totalPages; page++) {
+        html +=
+            '<button type="button" class="' +
+            (page === currentPage ? "active" : "") +
+            '" onclick="window.goToTemplateSentPage(' + page + ')">' +
+            page + '</button>';
+    }
+
+    html +=
+        '<button type="button" ' +
+        (currentPage === totalPages ? "disabled" : "") +
+        ' onclick="window.goToTemplateSentPage(' + (currentPage + 1) + ')">Next →</button>';
+
+    html +=
+        '<span class="pagination-info">Page ' + currentPage +
+        ' of ' + totalPages + ' • ' + totalItems + ' candidates</span>';
+
+    pagination.innerHTML = html;
+};
+
+window.renderTemplateSentTable = function(data) {
+    const container = document.getElementById("template-sent");
+    const summary = document.getElementById("template-sent-summary");
+
+    if (!data.length) {
+        container.innerHTML = "<p>No approved template candidates found in this category.</p>";
+        summary.innerHTML = "";
+        window.renderTemplateSentPagination(0);
+        return;
+    }
+
+    const totalPages = Math.ceil(data.length / CANDIDATES_PER_PAGE);
+
+    if (window.templateSentPage < 1 || window.templateSentPage > totalPages) {
+        window.templateSentPage = 1;
+    }
+
+    const startIndex = (window.templateSentPage - 1) * CANDIDATES_PER_PAGE;
+    const pageData = data.slice(startIndex, startIndex + CANDIDATES_PER_PAGE);
+
+    summary.innerHTML =
+        "<p><strong>Approved Template Candidates</strong> — showing " +
+        (startIndex + 1) + "-" +
+        Math.min(startIndex + pageData.length, data.length) +
+        " of " + data.length + " candidate(s)</p>";
 
     container.innerHTML =
-        "<p>Loading template sent list...</p>";
+        '<div class="table-wrap">' +
+        '<table class="candidate-table">' +
+        '<thead><tr>' +
+        '<th>WhatsApp Number</th>' +
+        '<th>Candidate Name</th>' +
+        '<th>Category</th>' +
+        '<th>Application Status</th>' +
+        '<th>Onboarding Status</th>' +
+        '<th>Interview Status</th>' +
+        '<th>Template</th>' +
+        '<th>Sent At</th>' +
+        '<th>Action</th>' +
+        '</tr></thead><tbody>' +
+        pageData.map(function(item) {
+            const phone = escapeHtml(item.phone);
+            const name = escapeHtml(item.name || "Not Added");
+            const category = escapeHtml(item.category || "New");
+            const status = escapeHtml(item.status || "New");
+            const onboarding = escapeHtml(item.onboardingStatus || "Pending");
+            const interview = escapeHtml(item.interviewStatus || "Not Scheduled");
+            const template = escapeHtml(item.template || "");
+            const sentAt = escapeHtml(item.sentAt || "");
+
+            return '<tr>' +
+                '<td class="phone-cell">📱 ' + phone + '</td>' +
+                '<td><strong>' + name + '</strong></td>' +
+                '<td>' + category + '</td>' +
+                '<td>' + status + '</td>' +
+                '<td>' + onboarding + '</td>' +
+                '<td>' + interview + '</td>' +
+                '<td>' + template + '</td>' +
+                '<td class="date-cell">' + sentAt + '</td>' +
+                '<td class="save-cell">' +
+                    '<button type="button" class="details" onclick="window.viewCandidateDetails(\\'' + phone + '\\')">👁 View</button>' +
+                '</td>' +
+            '</tr>';
+        }).join("") +
+        '</tbody></table></div>';
+
+    window.renderTemplateSentPagination(data.length);
+};
+
+window.openTemplateCategoryWindow = function(category) {
+    const url =
+        window.location.origin +
+        window.location.pathname +
+        "?templateCategory=" +
+        encodeURIComponent(category);
+
+    const newWindow = window.open(url, "_blank", "noopener");
+    if (newWindow) newWindow.focus();
+};
+
+function getTemplateCategoryFromUrl() {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        return params.get("templateCategory") || "All";
+    } catch (error) {
+        return "All";
+    }
+}
+
+window.filterTemplateSentByCategory = function(category) {
+    window.templateSentCategory = category || "All";
+    window.templateSentPage = 1;
+
+    const all = window.templateSentData || [];
+    const filtered = window.templateSentCategory === "All"
+        ? all
+        : all.filter(function(item) {
+            return (item.category || "New") === window.templateSentCategory;
+        });
+
+    window.renderTemplateSentTable(filtered);
+};
+
+window.goToTemplateSentPage = function(page) {
+    const all = window.templateSentData || [];
+    const category = window.templateSentCategory || "All";
+    const data = category === "All"
+        ? all
+        : all.filter(function(item) {
+            return (item.category || "New") === category;
+        });
+
+    const totalPages = Math.max(1, Math.ceil(data.length / CANDIDATES_PER_PAGE));
+    if (page < 1 || page > totalPages) return;
+
+    window.templateSentPage = page;
+    window.renderTemplateSentTable(data);
+    window.scrollTo({ top: document.getElementById("template-sent").offsetTop - 30, behavior: "smooth" });
+};
+
+window.loadTemplateSent = async function() {
+    const key = document.getElementById("adminKey").value;
+
+    if (!key) {
+        showResult("Please enter HR panel key.", false);
+        return;
+    }
+
+    const container = document.getElementById("template-sent");
+    const summary = document.getElementById("template-sent-summary");
+
+    container.innerHTML = "<p>Loading template sent list...</p>";
 
     try {
+        const response = await fetch("/api/template-sent", {
+            method: "GET",
+            headers: { "x-admin-key": key }
+        });
 
-        const response =
-            await fetch(
-                "/api/template-sent",
-                {
-                    method: "GET",
-                    headers: {
-                        "x-admin-key": key
-                    }
-                }
-            );
-
-        const data =
-            await response.json();
+        const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(
-                data.error ||
-                "Failed to load template sent list"
-            );
+            throw new Error(data.error || "Failed to load template sent list");
         }
 
-        if (!data.length) {
-            summary.innerHTML =
-                "<p><strong>0 candidates</strong></p>";
+        window.templateSentData = data || [];
+        window.templateSentPage = 1;
+        window.templateSentCategory = getTemplateCategoryFromUrl();
 
-            container.innerHTML =
-                "<p>No approved template messages have been sent yet.</p>";
-
+        if (!window.templateSentData.length) {
+            summary.innerHTML = "<p><strong>0 candidates</strong></p>";
+            container.innerHTML = "<p>No approved template messages have been sent yet.</p>";
+            window.renderTemplateSentPagination(0);
             return;
         }
 
-        summary.innerHTML =
-            "<p><strong>" +
-            data.length +
-            " candidate(s) received a first template message.</strong></p>";
-
-        container.innerHTML =
-            '<div class="table-wrap">' +
-            '<table class="candidate-table">' +
-            '<thead>' +
-            '<tr>' +
-            '<th>Candidate</th>' +
-            '<th>WhatsApp Number</th>' +
-            '<th>Template</th>' +
-            '<th>Sent At</th>' +
-            '</tr>' +
-            '</thead>' +
-            '<tbody>' +
-            data.map(function(item) {
-
-                const name =
-                    escapeHtml(item.name || "Not Added");
-
-                const phone =
-                    escapeHtml(item.phone);
-
-                const template =
-                    escapeHtml(item.template);
-
-                const sentAt =
-                    escapeHtml(item.sentAt);
-
-                return '<tr>' +
-                    '<td><strong>' + name + '</strong></td>' +
-                    '<td class="phone-cell">📱 ' + phone + '</td>' +
-                    '<td>' + template + '</td>' +
-                    '<td class="date-cell">' + sentAt + '</td>' +
-                    '</tr>';
-
-            }).join("") +
-            '</tbody>' +
-            '</table>' +
-            '</div>';
+        window.filterTemplateSentByCategory(
+            window.templateSentCategory || "All"
+        );
 
     } catch (error) {
-
         container.innerHTML = "";
-
-        showResult(
-            "❌ " + error.message,
-            false
-        );
+        showResult("❌ " + error.message, false);
     }
 };
 
