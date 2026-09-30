@@ -75,6 +75,11 @@ async function initializeDatabase() {
         ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT ''
     `);
 
+    await pool.query(`
+        ALTER TABLE candidates
+        ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'New'
+    `);
+
     // Store candidate message history
     await pool.query(`
         CREATE TABLE IF NOT EXISTS candidate_messages (
@@ -519,6 +524,7 @@ app.get(
                     onboarding_status AS "onboardingStatus",
                     interview_status AS "interviewStatus",
                     notes,
+                    category,
                     last_message AS "lastMessage"
                 FROM candidates
                 ORDER BY last_message DESC
@@ -594,6 +600,22 @@ app.put(
                     req.body.notes || ""
                 ).trim();
 
+            const allowedCategories = [
+                "New",
+                "Shortlisted",
+                "Interview",
+                "Selected",
+                "Rejected",
+                "On Hold"
+            ];
+
+            const category =
+                allowedCategories.includes(
+                    String(req.body.category || "").trim()
+                )
+                    ? String(req.body.category).trim()
+                    : "New";
+
             await pool.query(
                 `
                 UPDATE candidates
@@ -602,8 +624,9 @@ app.put(
                     status = $2,
                     onboarding_status = $3,
                     interview_status = $4,
-                    notes = $5
-                WHERE phone = $6
+                    notes = $5,
+                    category = $6
+                WHERE phone = $7
                 `,
                 [
                     name,
@@ -611,6 +634,7 @@ app.put(
                     onboardingStatus,
                     interviewStatus,
                     notes,
+                    category,
                     phone
                 ]
             );
@@ -1068,6 +1092,22 @@ app.get("/hr", (req, res) => {
         🔄 Load Candidates
     </button>
 
+    <label>
+        🗂️ View by Category
+    </label>
+
+    <select id="categoryFilter" onchange="window.filterCandidatesByCategory()">
+        <option value="All">All Candidates</option>
+        <option value="New">New</option>
+        <option value="Shortlisted">Shortlisted</option>
+        <option value="Interview">Interview</option>
+        <option value="Selected">Selected</option>
+        <option value="Rejected">Rejected</option>
+        <option value="On Hold">On Hold</option>
+    </select>
+
+    <div id="category-summary"></div>
+
     <div id="candidates"></div>
 
 </div>
@@ -1094,6 +1134,16 @@ app.get("/hr", (req, res) => {
 
         <label>Candidate Name</label>
         <input type="text" id="detail-name" placeholder="Candidate name">
+
+        <label>🗂️ Candidate Category</label>
+        <select id="detail-category">
+            <option value="New">New</option>
+            <option value="Shortlisted">Shortlisted</option>
+            <option value="Interview">Interview</option>
+            <option value="Selected">Selected</option>
+            <option value="Rejected">Rejected</option>
+            <option value="On Hold">On Hold</option>
+        </select>
 
         <label>Application Status</label>
         <select id="detail-status">
@@ -1416,7 +1466,57 @@ async function loadCandidates() {
             return;
         }
 
+        window.allCandidatesData = data;
+
+        window.renderCandidatesTable(data);
+
+        showResult(
+            "✅ Candidates loaded successfully.",
+            true
+        );
+
+    } catch (error) {
+
+        showResult(
+            "❌ " + error.message,
+            false
+        );
+    }
+}
+
+
+// ===============================
+// RENDER / FILTER CANDIDATES
+// ===============================
+
+window.renderCandidatesTable = function(data) {
+
+    const container =
+        document.getElementById("candidates");
+
+    const summary =
+        document.getElementById("category-summary");
+
+    if (!data.length) {
         container.innerHTML =
+            "<p>No candidates found in this category.</p>";
+        if (summary) summary.innerHTML = "";
+        return;
+    }
+
+    const counts = {};
+    data.forEach(function(candidate) {
+        const category = candidate.category || "New";
+        counts[category] = (counts[category] || 0) + 1;
+    });
+
+    if (summary) {
+        summary.innerHTML =
+            "<p><strong>Showing " + data.length +
+            " candidate(s)</strong></p>";
+    }
+
+    container.innerHTML =
             '<div class="table-wrap">' +
             '<table class="candidate-table">' +
             '<thead>' +
@@ -1424,6 +1524,7 @@ async function loadCandidates() {
             '<th>WhatsApp Number</th>' +
             '<th>Last Message</th>' +
             '<th>Candidate Name</th>' +
+            '<th>Category</th>' +
             '<th>Application Status</th>' +
             '<th>Onboarding Status</th>' +
             '<th>Interview Status</th>' +
@@ -1439,6 +1540,9 @@ async function loadCandidates() {
 
                 const name =
                     escapeHtml(candidate.name);
+
+                const category =
+                    escapeHtml(candidate.category || "New");
 
                 const status =
                     escapeHtml(candidate.status || "New");
@@ -1466,6 +1570,28 @@ async function loadCandidates() {
                         '<input type="text" id="name-' + phone +
                         '" value="' + name +
                         '" placeholder="Candidate name">' +
+                    '</td>' +
+                    '<td>' +
+                        '<select id="category-' + phone + '">' +
+                            '<option value="New"' +
+                                (category === "New" ? ' selected' : '') +
+                            '>New</option>' +
+                            '<option value="Shortlisted"' +
+                                (category === "Shortlisted" ? ' selected' : '') +
+                            '>Shortlisted</option>' +
+                            '<option value="Interview"' +
+                                (category === "Interview" ? ' selected' : '') +
+                            '>Interview</option>' +
+                            '<option value="Selected"' +
+                                (category === "Selected" ? ' selected' : '') +
+                            '>Selected</option>' +
+                            '<option value="Rejected"' +
+                                (category === "Rejected" ? ' selected' : '') +
+                            '>Rejected</option>' +
+                            '<option value="On Hold"' +
+                                (category === "On Hold" ? ' selected' : '') +
+                            '>On Hold</option>' +
+                        '</select>' +
                     '</td>' +
                     '<td>' +
                         '<select id="status-' + phone + '">' +
@@ -1558,6 +1684,25 @@ async function loadCandidates() {
 }
 
 
+window.filterCandidatesByCategory = function() {
+
+    const filter =
+        document.getElementById("categoryFilter").value;
+
+    const allCandidates =
+        window.allCandidatesData || [];
+
+    const filtered =
+        filter === "All"
+            ? allCandidates
+            : allCandidates.filter(function(candidate) {
+                return (candidate.category || "New") === filter;
+            });
+
+    window.renderCandidatesTable(filtered);
+};
+
+
 // ===============================
 // SAVE CANDIDATE
 // ===============================
@@ -1572,6 +1717,11 @@ window.saveCandidate = async function(phone) {
     const name =
         document.getElementById(
             "name-" + phone
+        ).value;
+
+    const category =
+        document.getElementById(
+            "category-" + phone
         ).value;
 
     const status =
@@ -1630,6 +1780,9 @@ window.saveCandidate = async function(phone) {
 
                         name:
                             name,
+
+                        category:
+                            category,
 
                         status:
                             status,
@@ -1818,6 +1971,12 @@ window.viewCandidateDetails = function(phone) {
     document.getElementById("detail-name").value =
         nameInput ? nameInput.value : "";
 
+    const categorySelect =
+        document.getElementById("category-" + phone);
+
+    document.getElementById("detail-category").value =
+        categorySelect ? categorySelect.value : "New";
+
     document.getElementById("detail-status").value =
         statusSelect ? statusSelect.value : "New";
 
@@ -1957,6 +2116,9 @@ window.saveCandidateDetails = async function() {
     const name =
         document.getElementById("detail-name").value;
 
+    const category =
+        document.getElementById("detail-category").value;
+
     const status =
         document.getElementById("detail-status").value;
 
@@ -1998,253 +2160,3 @@ window.saveCandidateDetails = async function() {
                     },
                     body: JSON.stringify({
                         name: name,
-                        status: status,
-                        onboardingStatus:
-                            onboardingStatus,
-                        interviewStatus:
-                            interviewStatus,
-                        notes: notes
-                    })
-                }
-            );
-
-        const data =
-            await response.json();
-
-        if (!response.ok) {
-            throw new Error(
-                data.error ||
-                "Failed to save candidate"
-            );
-        }
-
-        const nameInput =
-            document.getElementById("name-" + phone);
-
-        const statusSelect =
-            document.getElementById("status-" + phone);
-
-        const onboardingSelect =
-            document.getElementById("onboarding-" + phone);
-
-        const interviewSelect =
-            document.getElementById("interview-" + phone);
-
-        const notesInput =
-            document.getElementById("notes-" + phone);
-
-        if (nameInput) nameInput.value = name;
-        if (statusSelect) statusSelect.value = status;
-        if (onboardingSelect)
-            onboardingSelect.value = onboardingStatus;
-        if (interviewSelect)
-            interviewSelect.value = interviewStatus;
-        if (notesInput) notesInput.value = notes;
-
-        window.closeCandidateDetails();
-
-        showResult(
-            "✅ Candidate saved successfully!",
-            true
-        );
-
-    } catch (error) {
-
-        showResult(
-            "❌ " + error.message,
-            false
-        );
-    }
-};
-
-
-// ===============================
-// RESULT MESSAGE
-// ===============================
-
-function showResult(
-    message,
-    success
-) {
-
-    const result =
-        document.getElementById(
-            "result"
-        );
-
-    result.style.display =
-        "block";
-
-    result.innerText =
-        message;
-}
-
-</script>
-
-</body>
-
-</html>
-    `);
-
-});
-
-// ===============================
-// SEND TEMPLATE FROM HR PANEL
-// ===============================
-
-app.post(
-    "/api/send-template",
-    checkAdmin,
-    async (req, res) => {
-
-        try {
-
-            const phone =
-                String(
-                    req.body.phone || ""
-                ).replace(/\D/g, "");
-
-            if (!phone) {
-
-                return res
-                    .status(400)
-                    .json({
-                        error:
-                            "Candidate WhatsApp number is required."
-                    });
-            }
-
-            const result =
-                await sendWhatsAppTemplate(
-                    phone
-                );
-
-            console.log(
-                "Template sent to:",
-                phone
-            );
-
-            res.json({
-                success: true,
-                result: result
-            });
-
-        } catch (error) {
-
-            console.error(
-                "Template send failed:",
-                error.message
-            );
-
-            res.status(500).json({
-                error:
-                    error.message
-            });
-        }
-    }
-);
-
-// ===============================
-// SEND TEXT FROM HR PANEL
-// ===============================
-
-app.post(
-    "/api/send-text",
-    checkAdmin,
-    async (req, res) => {
-
-        try {
-
-            const phone =
-                String(
-                    req.body.phone || ""
-                ).replace(/\D/g, "");
-
-            const message =
-                String(
-                    req.body.message || ""
-                ).trim();
-
-            if (!phone) {
-
-                return res
-                    .status(400)
-                    .json({
-                        error:
-                            "Candidate WhatsApp number is required."
-                    });
-            }
-
-            if (!message) {
-
-                return res
-                    .status(400)
-                    .json({
-                        error:
-                            "Message is required."
-                    });
-            }
-
-            const result =
-                await sendWhatsAppMessage(
-                    phone,
-                    message
-                );
-
-            console.log(
-                "Text message sent to:",
-                phone
-            );
-
-            res.json({
-                success: true,
-                result: result
-            });
-
-        } catch (error) {
-
-            console.error(
-                "Text send failed:",
-                error.message
-            );
-
-            res.status(500).json({
-                error:
-                    error.message
-            });
-        }
-    }
-);
-
-// ===============================
-// START SERVER
-// ===============================
-
-const PORT =
-    process.env.PORT || 10000;
-
-initializeDatabase()
-    .then(() => {
-
-        app.listen(
-            PORT,
-            "0.0.0.0",
-            () => {
-
-                console.log(
-                    `Server running on port ${PORT}`
-                );
-
-            }
-        );
-
-    })
-    .catch((error) => {
-
-        console.error(
-            "Database initialization failed:",
-            error
-        );
-
-        process.exit(1);
-    });
