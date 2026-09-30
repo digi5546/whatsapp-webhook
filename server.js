@@ -1669,18 +1669,6 @@ window.renderCandidatesTable = function(data) {
             '</tbody>' +
             '</table>' +
             '</div>';
-        showResult(
-            "✅ Candidates loaded successfully.",
-            true
-        );
-
-    } catch (error) {
-
-        showResult(
-            "❌ " + error.message,
-            false
-        );
-    }
 }
 
 
