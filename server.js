@@ -921,6 +921,53 @@ app.get("/hr", (req, res) => {
             color: white;
         }
 
+        .message-history {
+            margin-top: 10px;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 12px;
+            background: #f9fafb;
+            max-height: 360px;
+            overflow-y: auto;
+        }
+
+        .message-item {
+            max-width: 82%;
+            padding: 9px 11px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .message-incoming {
+            margin-right: auto;
+            background: #e5e7eb;
+            color: #111827;
+        }
+
+        .message-outgoing {
+            margin-left: auto;
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .message-meta {
+            margin-top: 5px;
+            font-size: 11px;
+            opacity: 0.7;
+        }
+
+        .message-empty,
+        .message-loading,
+        .message-error {
+            color: #666;
+            font-size: 13px;
+            padding: 8px 0;
+        }
+
         #result {
 
             margin-top: 20px;
@@ -1057,6 +1104,11 @@ app.get("/hr", (req, res) => {
 
         <label>HR Notes</label>
         <textarea id="detail-notes" placeholder="HR notes..."></textarea>
+
+        <label>💬 WhatsApp Message History</label>
+        <div id="message-history" class="message-history">
+            <div class="message-loading">Loading messages...</div>
+        </div>
 
         <div class="details-actions">
             <button
@@ -1590,6 +1642,106 @@ window.saveCandidate = async function(phone) {
 // CANDIDATE DETAILED VIEW
 // ===============================
 
+async function loadCandidateMessages(phone) {
+
+    const container =
+        document.getElementById("message-history");
+
+    const key =
+        document.getElementById("adminKey").value;
+
+    if (!container) return;
+
+    container.innerHTML =
+        '<div class="message-loading">Loading messages...</div>';
+
+    if (!key) {
+        container.innerHTML =
+            '<div class="message-error">HR panel key is required.</div>';
+        return;
+    }
+
+    try {
+
+        const response =
+            await fetch(
+                "/api/candidates/" +
+                encodeURIComponent(phone) +
+                "/messages",
+                {
+                    method: "GET",
+                    headers: {
+                        "x-admin-key": key
+                    }
+                }
+            );
+
+        const data =
+            await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.error ||
+                "Failed to load message history"
+            );
+        }
+
+        if (!data.length) {
+            container.innerHTML =
+                '<div class="message-empty">No WhatsApp messages recorded yet.</div>';
+            return;
+        }
+
+        container.innerHTML =
+            data.map(function(item) {
+
+                const direction =
+                    item.direction === "outgoing"
+                        ? "outgoing"
+                        : "incoming";
+
+                const label =
+                    direction === "outgoing"
+                        ? "HR"
+                        : "Candidate";
+
+                const date =
+                    item.createdAt
+                        ? new Date(item.createdAt).toLocaleString()
+                        : "";
+
+                return (
+                    '<div class="message-item message-' +
+                    direction +
+                    '">' +
+                    '<div>' +
+                    escapeHtml(item.message) +
+                    '</div>' +
+                    '<div class="message-meta">' +
+                    escapeHtml(label) +
+                    ' • ' +
+                    escapeHtml(item.messageType || "text") +
+                    ' • ' +
+                    escapeHtml(date) +
+                    '</div>' +
+                    '</div>'
+                );
+
+            }).join("");
+
+        container.scrollTop = container.scrollHeight;
+
+    } catch (error) {
+
+        container.innerHTML =
+            '<div class="message-error">❌ ' +
+            escapeHtml(error.message) +
+            '</div>';
+    }
+}
+
+
+
 window.viewCandidateDetails = function(phone) {
 
     const nameInput =
@@ -1650,6 +1802,8 @@ window.viewCandidateDetails = function(phone) {
 
     document.getElementById("candidateModal").style.display =
         "block";
+
+    loadCandidateMessages(phone);
 };
 
 
