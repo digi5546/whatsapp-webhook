@@ -660,6 +660,49 @@ app.put(
 );
 
 // ===============================
+// TEMPLATE SENT LIST API
+// ===============================
+
+app.get(
+    "/api/template-sent",
+    checkAdmin,
+    async (req, res) => {
+        try {
+            const result = await pool.query(`
+                SELECT
+                    cm.phone,
+                    COALESCE(c.name, '') AS name,
+                    cm.message AS template,
+                    cm.whatsapp_message_id AS "messageId",
+                    cm.created_at AS "sentAt"
+                FROM candidate_messages cm
+                LEFT JOIN candidates c
+                    ON c.phone = cm.phone
+                WHERE cm.message_type = 'template'
+                  AND cm.id = (
+                      SELECT MIN(cm2.id)
+                      FROM candidate_messages cm2
+                      WHERE cm2.phone = cm.phone
+                        AND cm2.message_type = 'template'
+                  )
+                ORDER BY cm.created_at DESC
+            `);
+
+            res.json(result.rows);
+        } catch (error) {
+            console.error(
+                "Failed to load template sent list:",
+                error.message
+            );
+
+            res.status(500).json({
+                error: "Failed to load template sent list."
+            });
+        }
+    }
+);
+
+// ===============================
 // CANDIDATE MESSAGE HISTORY API
 // ===============================
 
@@ -1110,6 +1153,25 @@ app.get("/hr", (req, res) => {
 
     <div id="candidates"></div>
 
+    <hr>
+
+    <h3>📋 First Template Messages Sent</h3>
+
+    <p style="color:#666;font-size:13px;">
+        Candidates who have received their first approved template message.
+    </p>
+
+    <button
+        type="button"
+        class="text"
+        onclick="window.loadTemplateSent()"
+    >
+        📋 Load Template Sent List
+    </button>
+
+    <div id="template-sent-summary"></div>
+    <div id="template-sent"></div>
+
 </div>
 
 <div id="candidateModal" class="details-modal">
@@ -1394,6 +1456,120 @@ async function sendText() {
         );
     }
 }
+
+
+// ===============================
+// LOAD FIRST TEMPLATE SENT LIST
+// ===============================
+
+window.loadTemplateSent = async function() {
+
+    const key =
+        document.getElementById("adminKey").value;
+
+    if (!key) {
+        showResult(
+            "Please enter HR panel key.",
+            false
+        );
+        return;
+    }
+
+    const container =
+        document.getElementById("template-sent");
+
+    const summary =
+        document.getElementById("template-sent-summary");
+
+    container.innerHTML =
+        "<p>Loading template sent list...</p>";
+
+    try {
+
+        const response =
+            await fetch(
+                "/api/template-sent",
+                {
+                    method: "GET",
+                    headers: {
+                        "x-admin-key": key
+                    }
+                }
+            );
+
+        const data =
+            await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.error ||
+                "Failed to load template sent list"
+            );
+        }
+
+        if (!data.length) {
+            summary.innerHTML =
+                "<p><strong>0 candidates</strong></p>";
+
+            container.innerHTML =
+                "<p>No approved template messages have been sent yet.</p>";
+
+            return;
+        }
+
+        summary.innerHTML =
+            "<p><strong>" +
+            data.length +
+            " candidate(s) received a first template message.</strong></p>";
+
+        container.innerHTML =
+            '<div class="table-wrap">' +
+            '<table class="candidate-table">' +
+            '<thead>' +
+            '<tr>' +
+            '<th>Candidate</th>' +
+            '<th>WhatsApp Number</th>' +
+            '<th>Template</th>' +
+            '<th>Sent At</th>' +
+            '</tr>' +
+            '</thead>' +
+            '<tbody>' +
+            data.map(function(item) {
+
+                const name =
+                    escapeHtml(item.name || "Not Added");
+
+                const phone =
+                    escapeHtml(item.phone);
+
+                const template =
+                    escapeHtml(item.template);
+
+                const sentAt =
+                    escapeHtml(item.sentAt);
+
+                return '<tr>' +
+                    '<td><strong>' + name + '</strong></td>' +
+                    '<td class="phone-cell">📱 ' + phone + '</td>' +
+                    '<td>' + template + '</td>' +
+                    '<td class="date-cell">' + sentAt + '</td>' +
+                    '</tr>';
+
+            }).join("") +
+            '</tbody>' +
+            '</table>' +
+            '</div>';
+
+    } catch (error) {
+
+        container.innerHTML = "";
+
+        showResult(
+            "❌ " + error.message,
+            false
+        );
+    }
+};
 
 
 // ===============================
