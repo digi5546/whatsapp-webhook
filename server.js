@@ -1179,6 +1179,8 @@ async function loadCandidates() {
 
                 \`;
 
+            }).join("");
+
         showResult(
             "✅ Candidates loaded successfully.",
             true
