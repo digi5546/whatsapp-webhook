@@ -13,6 +13,7 @@ const VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN;
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
 const ADMIN_PANEL_KEY = process.env.ADMIN_PANEL_KEY;
+const SHEET_API_KEY = process.env.SHEET_API_KEY;
 const DATABASE_URL = process.env.DATABASE_URL;
 
 const GRAPH_API_VERSION = "v25.0";
@@ -2418,6 +2419,104 @@ function showResult(
     `);
 
 });
+
+// ===============================
+// SEND TEMPLATE FROM GOOGLE SHEET
+// ===============================
+
+app.post(
+    "/api/sheet-send-template",
+    async (req, res) => {
+
+        try {
+
+            const key =
+                req.headers["x-sheet-key"];
+
+            if (!SHEET_API_KEY) {
+                return res
+                    .status(500)
+                    .json({
+                        error:
+                            "SHEET_API_KEY is not configured."
+                    });
+            }
+
+            if (key !== SHEET_API_KEY) {
+                return res
+                    .status(401)
+                    .json({
+                        error:
+                            "Unauthorized"
+                    });
+            }
+
+            const phone =
+                String(
+                    req.body.phone || ""
+                ).replace(/\D/g, "");
+
+            const name =
+                String(
+                    req.body.name || ""
+                ).trim();
+
+            if (!phone) {
+                return res
+                    .status(400)
+                    .json({
+                        error:
+                            "Candidate WhatsApp number is required."
+                    });
+            }
+
+            const result =
+                await sendWhatsAppTemplate(
+                    phone
+                );
+
+            await pool.query(
+                `
+                INSERT INTO candidates
+                    (phone, name, last_message)
+                VALUES ($1, $2, NOW())
+                ON CONFLICT (phone)
+                DO UPDATE SET
+                    name = CASE
+                        WHEN EXCLUDED.name <> ''
+                        THEN EXCLUDED.name
+                        ELSE candidates.name
+                    END,
+                    last_message = NOW()
+                `,
+                [phone, name]
+            );
+
+            res.json({
+                success: true,
+                phone: phone,
+                name: name,
+                messageId:
+                    result.messages &&
+                    result.messages[0]
+                        ? result.messages[0].id
+                        : null
+            });
+
+        } catch (error) {
+
+            console.error(
+                "Google Sheet template send failed:",
+                error.message
+            );
+
+            res.status(500).json({
+                error:
+                    error.message
+            });
+        }
+    }
+);
 
 // ===============================
 // SEND TEMPLATE FROM HR PANEL
