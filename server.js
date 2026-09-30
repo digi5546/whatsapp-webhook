@@ -1694,7 +1694,7 @@ window.renderTemplateSentTable = function(data) {
                 '<td>' + template + '</td>' +
                 '<td class="date-cell">' + sentAt + '</td>' +
                 '<td class="save-cell">' +
-                    '<button type="button" class="details" onclick="window.viewCandidateDetails(\\'' + phone + '\\')">👁 View</button>' +
+                    '<button type="button" class="details" onclick="window.viewCandidateDetails(&quot;' + phone + '&quot;)">👁 View</button>' +
                 '</td>' +
             '</tr>';
         }).join("") +
