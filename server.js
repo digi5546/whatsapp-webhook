@@ -2148,3 +2148,258 @@ window.saveCandidateDetails = async function() {
                     },
                     body: JSON.stringify({
                         name: name,
+                        category: category,
+                        status: status,
+                        onboardingStatus:
+                            onboardingStatus,
+                        interviewStatus:
+                            interviewStatus,
+                        notes: notes
+                    })
+                }
+            );
+
+        const data =
+            await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.error ||
+                "Failed to save candidate"
+            );
+        }
+
+        const nameInput =
+            document.getElementById("name-" + phone);
+
+        const categorySelect =
+            document.getElementById("category-" + phone);
+
+        const statusSelect =
+            document.getElementById("status-" + phone);
+
+        const onboardingSelect =
+            document.getElementById("onboarding-" + phone);
+
+        const interviewSelect =
+            document.getElementById("interview-" + phone);
+
+        const notesInput =
+            document.getElementById("notes-" + phone);
+
+        if (nameInput) nameInput.value = name;
+        if (categorySelect) categorySelect.value = category;
+        if (statusSelect) statusSelect.value = status;
+        if (onboardingSelect)
+            onboardingSelect.value = onboardingStatus;
+        if (interviewSelect)
+            interviewSelect.value = interviewStatus;
+        if (notesInput) notesInput.value = notes;
+
+        window.closeCandidateDetails();
+
+        showResult(
+            "✅ Candidate saved successfully!",
+            true
+        );
+
+    } catch (error) {
+
+        showResult(
+            "❌ " + error.message,
+            false
+        );
+    }
+};
+
+
+// ===============================
+// RESULT MESSAGE
+// ===============================
+
+function showResult(
+    message,
+    success
+) {
+
+    const result =
+        document.getElementById(
+            "result"
+        );
+
+    result.style.display =
+        "block";
+
+    result.innerText =
+        message;
+}
+
+</script>
+
+</body>
+
+</html>
+    `);
+
+});
+
+// ===============================
+// SEND TEMPLATE FROM HR PANEL
+// ===============================
+
+app.post(
+    "/api/send-template",
+    checkAdmin,
+    async (req, res) => {
+
+        try {
+
+            const phone =
+                String(
+                    req.body.phone || ""
+                ).replace(/\D/g, "");
+
+            if (!phone) {
+
+                return res
+                    .status(400)
+                    .json({
+                        error:
+                            "Candidate WhatsApp number is required."
+                    });
+            }
+
+            const result =
+                await sendWhatsAppTemplate(
+                    phone
+                );
+
+            console.log(
+                "Template sent to:",
+                phone
+            );
+
+            res.json({
+                success: true,
+                result: result
+            });
+
+        } catch (error) {
+
+            console.error(
+                "Template send failed:",
+                error.message
+            );
+
+            res.status(500).json({
+                error:
+                    error.message
+            });
+        }
+    }
+);
+
+// ===============================
+// SEND TEXT FROM HR PANEL
+// ===============================
+
+app.post(
+    "/api/send-text",
+    checkAdmin,
+    async (req, res) => {
+
+        try {
+
+            const phone =
+                String(
+                    req.body.phone || ""
+                ).replace(/\D/g, "");
+
+            const message =
+                String(
+                    req.body.message || ""
+                ).trim();
+
+            if (!phone) {
+
+                return res
+                    .status(400)
+                    .json({
+                        error:
+                            "Candidate WhatsApp number is required."
+                    });
+            }
+
+            if (!message) {
+
+                return res
+                    .status(400)
+                    .json({
+                        error:
+                            "Message is required."
+                    });
+            }
+
+            const result =
+                await sendWhatsAppMessage(
+                    phone,
+                    message
+                );
+
+            console.log(
+                "Text message sent to:",
+                phone
+            );
+
+            res.json({
+                success: true,
+                result: result
+            });
+
+        } catch (error) {
+
+            console.error(
+                "Text send failed:",
+                error.message
+            );
+
+            res.status(500).json({
+                error:
+                    error.message
+            });
+        }
+    }
+);
+
+// ===============================
+// START SERVER
+// ===============================
+
+const PORT =
+    process.env.PORT || 10000;
+
+initializeDatabase()
+    .then(() => {
+
+        app.listen(
+            PORT,
+            "0.0.0.0",
+            () => {
+
+                console.log(
+                    `Server running on port ${PORT}`
+                );
+
+            }
+        );
+
+    })
+    .catch((error) => {
+
+        console.error(
+            "Database initialization failed:",
+            error
+        );
+
+        process.exit(1);
+    });
