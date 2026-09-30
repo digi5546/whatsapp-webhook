@@ -1200,7 +1200,7 @@ async function loadCandidates() {
 // SAVE CANDIDATE
 // ===============================
 
-async function saveCandidate(phone) {
+window.saveCandidate = async function(phone) {
 
     const key =
         document.getElementById(
